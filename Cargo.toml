@@ -1,0 +1,20 @@
+[package]
+name = "airwolf"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+rico8 = { git = "https://github.com/zeenix/rico8", default-features = false }
+libm = "0.2"
+
+# Standalone workspace so the project builds the same inside and outside
+# the RICO-8 source tree.
+[workspace]
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
