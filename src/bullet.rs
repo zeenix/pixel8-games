@@ -12,18 +12,21 @@ pub struct Bullet {
 }
 
 impl Bullet {
-    pub fn new_friendly(pos: Position, ctxt: &mut Context) -> Self {
-        Self::new(pos, entity::Type::FriendlyBullet, ctxt)
+    pub fn new_friendly(x: f32, y: f32, ctx: &mut Context) -> Self {
+        Self::new(x, y, entity::Type::FriendlyBullet, ctx)
     }
 
-    pub fn new_enemy(pos: Position, ctxt: &mut Context) -> Self {
-        Self::new(pos, entity::Type::EnemyBullet, ctxt)
+    pub fn new_enemy(x: f32, y: f32, ctx: &mut Context) -> Self {
+        Self::new(x, y, entity::Type::EnemyBullet, ctx)
     }
 
-    fn new(pos: Position, entity_type: entity::Type, ctxt: &mut Context) -> Self {
-        ctxt.sfx(SFX_ID);
+    fn new(x: f32, y: f32, entity_type: entity::Type, ctx: &mut Context) -> Self {
+        ctx.sfx(SFX_ID);
 
-        Self { pos, entity_type }
+        Self {
+            pos: Position { x, y },
+            entity_type,
+        }
     }
 }
 
