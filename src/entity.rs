@@ -1,6 +1,5 @@
 use core::any::Any;
 
-use libm::floorf;
 use rico8::Graphics;
 
 use crate::common::{Direction, Position, Size, Sprite};
@@ -18,15 +17,10 @@ pub trait Entity: 'static {
         let pos = self.position();
         let size = self.sprite().size;
 
-        // Ensure the entity is always at the middle of the pixel to avoid the
-        // "cobblestone effect" in case of diagonal movements.
-        let x = floorf(pos.x) + 0.5;
-        let y = floorf(pos.y) + 0.5;
-
         gfx.spr_ext(
             self.sprite().id,
-            x,
-            y,
+            pos.x,
+            pos.y,
             size.width.into(),
             size.height.into(),
             false,
