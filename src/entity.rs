@@ -15,7 +15,7 @@ pub trait Entity: 'static {
 
     fn draw(&self, gfx: &mut Graphics) {
         let pos = self.position();
-        let size = self.sprite().size;
+        let size = self.sprite().size_in_blocks();
 
         gfx.spr_ext(
             self.sprite().id,
