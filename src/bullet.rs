@@ -72,13 +72,13 @@ impl Entity for Bullet {
 
 const FRIENDLY_SPRITE_ID: SpriteId = SpriteId(64);
 const FRIENDLY_SIZE: Size = Size {
-    width: 6.0,
+    width: 8.0,
     height: 8.0,
 };
 const ENEMY_SPRITE_ID: SpriteId = SpriteId(65);
 const ENEMY_SIZE: Size = Size {
     width: 1.0,
-    height: 6.0,
+    height: 7.0,
 };
 const SPEED: u8 = 2;
 const SFX_ID: SfxId = SfxId(0);
