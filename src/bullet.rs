@@ -54,7 +54,7 @@ impl Entity for Bullet {
         self.entity_type
     }
 
-    fn update(&mut self) -> bool {
+    fn update(&mut self, _ctx: &mut Context) -> bool {
         if self.is_enemy() {
             self.go(Some(Direction::Down), SPEED);
 

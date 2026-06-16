@@ -1,6 +1,6 @@
 use core::any::Any;
 
-use rico8::Graphics;
+use rico8::{Context, Graphics};
 
 use crate::common::{Direction, Position, Size, Sprite};
 
@@ -11,7 +11,7 @@ pub trait Entity: 'static {
     fn entity_type(&self) -> Type;
 
     /// Returns `true` if the entity is outside the screen after the update.
-    fn update(&mut self) -> bool;
+    fn update(&mut self, ctx: &mut Context) -> bool;
 
     fn draw(&self, gfx: &mut Graphics) {
         let pos = self.position();
