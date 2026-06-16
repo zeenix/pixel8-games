@@ -1,4 +1,4 @@
-use rico8::{SpriteId, SCREEN_H};
+use rico8::{Context, SfxId, SpriteId, SCREEN_H};
 
 use crate::{
     common::{Direction, Position, Size, Sprite},
@@ -12,18 +12,18 @@ pub struct Bullet {
 }
 
 impl Bullet {
-    pub fn new_friendly(pos: Position) -> Self {
-        Self {
-            pos,
-            entity_type: entity::Type::FriendlyBullet,
-        }
+    pub fn new_friendly(pos: Position, ctxt: &mut Context) -> Self {
+        Self::new(pos, entity::Type::FriendlyBullet, ctxt)
     }
 
-    pub fn new_enemy(pos: Position) -> Self {
-        Self {
-            pos,
-            entity_type: entity::Type::EnemyBullet,
-        }
+    pub fn new_enemy(pos: Position, ctxt: &mut Context) -> Self {
+        Self::new(pos, entity::Type::EnemyBullet, ctxt)
+    }
+
+    fn new(pos: Position, entity_type: entity::Type, ctxt: &mut Context) -> Self {
+        ctxt.sfx(SFX_ID);
+
+        Self { pos, entity_type }
     }
 }
 
@@ -78,3 +78,4 @@ const ENEMY_SIZE: Size = Size {
     height: 6,
 };
 const SPEED: u8 = 2;
+const SFX_ID: SfxId = SfxId(0);
