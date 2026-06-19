@@ -12,4 +12,4 @@ dependencies = [
 [[package]]
 name = "rico8"
 version = "0.1.0"
-source = "git+https://github.com/zeenix/rico8#136981cfc83692eec2b3cf4412e63674b3543b33"
+source = "git+https://github.com/zeenix/rico8#419eea75fecd5221cdc2e06433033c4ef32b3d2c"
