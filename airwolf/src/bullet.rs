@@ -21,7 +21,7 @@ impl Bullet {
     }
 
     fn new(x: f32, y: f32, entity_type: entity::Type, ctx: &mut Context) -> Self {
-        //ctx.sfx(SFX_ID);
+        ctx.sfx(SFX_ID);
 
         Self {
             body: Body::new(x, y),
