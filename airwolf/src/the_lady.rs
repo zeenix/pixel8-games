@@ -1,4 +1,4 @@
-use rico8::{Button, Context, SfxId, SpriteId, SCREEN_H, SCREEN_W};
+use rico8::{Body, Button, Color, Context, SfxId, SpriteId, SCREEN_H, SCREEN_W};
 
 use crate::{
     common::{Direction, Position, Size, Sprite},
@@ -8,7 +8,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct TheLady {
-    pos: Position,
+    body: Body,
     last_bullet: f32,
 }
 
@@ -16,7 +16,7 @@ impl TheLady {
     pub fn new() -> Self {
         // TODO: Rotors.
         Self {
-            pos: STARTING_POSITION,
+            body: Body::new(STARTING_POSITION.x, STARTING_POSITION.y),
             last_bullet: 0.0,
         }
     }
@@ -42,12 +42,12 @@ impl Shooter for TheLady {
 }
 
 impl Entity for TheLady {
-    fn position(&self) -> Position {
-        self.pos
+    fn body(&self) -> Body {
+        self.body
     }
 
-    fn position_mut(&mut self) -> &mut Position {
-        &mut self.pos
+    fn body_mut(&mut self) -> &mut Body {
+        &mut self.body
     }
 
     fn sprite(&self) -> Sprite {
@@ -62,13 +62,13 @@ impl Entity for TheLady {
     }
 
     fn update(&mut self, ctx: &mut Context) {
-        let pos = self.pos;
+        let (x, y) = self.body.draw_pos();
         let Size { width, height } = self.sprite().size;
 
-        let can_left = pos.x > -1.0;
-        let can_right = pos.x + width < SCREEN_W as f32 - 2.0;
-        let can_up = pos.y > 0.0;
-        let can_down = pos.y + height < SCREEN_H as f32;
+        let can_left = x > -1.0;
+        let can_right = x + width < SCREEN_W as f32 - 2.0;
+        let can_up = y > 0.0;
+        let can_down = y + height < SCREEN_H as f32;
         let can_up_left = can_left && can_up;
         let can_down_left = can_left && can_down;
         let can_up_right = can_right && can_up;

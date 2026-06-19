@@ -1,20 +1,20 @@
 use core::any::Any;
 
-use rico8::{Context, Graphics, SCREEN_H};
+use rico8::{Body, Context, Graphics, SCREEN_H};
 
-use crate::common::{Direction, Position, Size, Sprite};
+use crate::common::{Direction, Size, Sprite};
 
 pub trait Entity: 'static {
-    fn position(&self) -> Position;
-    fn position_mut(&mut self) -> &mut Position;
+    fn body(&self) -> Body;
+    fn body_mut(&mut self) -> &mut Body;
     fn sprite(&self) -> Sprite;
     fn entity_type(&self) -> Type;
 
     /// Returns `true` if the entity is outside the screen.
     fn outside(&self) -> bool {
-        let pos = self.position();
+        let (x, y) = self.body().draw_pos();
 
-        pos.x >= SCREEN_H as f32 || pos.x < 0.0 || pos.y >= SCREEN_H as f32 || pos.y < 0.0
+        x >= SCREEN_H as f32 || x < 0.0 || y >= SCREEN_H as f32 || y < 0.0
     }
 
     fn update(&mut self, ctx: &mut Context);
@@ -24,13 +24,13 @@ pub trait Entity: 'static {
     }
 
     fn draw_default(&self, gfx: &mut Graphics) {
-        let pos = self.position();
+        let (x, y) = self.body().draw_pos();
         let size = self.sprite().size_in_blocks();
 
         gfx.sprite_ext(
             self.sprite().id,
-            pos.x,
-            pos.y,
+            x,
+            y,
             size.width,
             size.height,
             false,
@@ -43,28 +43,16 @@ pub trait Entity: 'static {
     }
 
     fn go_default(&mut self, dir: Direction, distance: f32) {
-        let pos = self.position_mut();
+        let body = self.body_mut();
         match dir {
-            Direction::Left => pos.x -= distance,
-            Direction::Right => pos.x += distance,
-            Direction::Up => pos.y -= distance,
-            Direction::Down => pos.y += distance,
-            Direction::UpLeft => {
-                pos.x -= distance;
-                pos.y -= distance;
-            }
-            Direction::DownLeft => {
-                pos.x -= distance;
-                pos.y += distance;
-            }
-            Direction::UpRight => {
-                pos.x += distance;
-                pos.y -= distance;
-            }
-            Direction::DownRight => {
-                pos.x += distance;
-                pos.y += distance;
-            }
+            Direction::Left => body.move_by(-distance, 0.0),
+            Direction::Right => body.move_by(distance, 0.0),
+            Direction::Up => body.move_by(0.0, -distance),
+            Direction::Down => body.move_by(0.0, distance),
+            Direction::UpLeft => body.move_by(-distance, -distance),
+            Direction::DownLeft => body.move_by(-distance, distance),
+            Direction::UpRight => body.move_by(distance, -distance),
+            Direction::DownRight => body.move_by(distance, distance),
         }
 
         // TODO: Handle collision.
@@ -76,11 +64,8 @@ pub trait Entity: 'static {
             return false;
         }
 
-        let Position { x: our_x, y: our_y } = self.position();
-        let Position {
-            x: other_x,
-            y: other_y,
-        } = other.position();
+        let (our_x, our_y) = self.body().draw_pos();
+        let (other_x, other_y) = other.body().draw_pos();
         let Size {
             width: our_width,
             height: our_height,

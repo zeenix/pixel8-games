@@ -21,8 +21,9 @@ pub trait Shooter: Entity {
         }
 
         let bprops = self.bullet_props();
-        let x = self.position().x + bprops.x_offset;
-        let y = self.position().y + bprops.y_offset;
+        let (x, y) = self.body().draw_pos();
+        let x = x + bprops.x_offset;
+        let y = y + bprops.y_offset;
         let bullet = if self.is_enemy() {
             Bullet::new_enemy(x, y, ctx)
         } else {

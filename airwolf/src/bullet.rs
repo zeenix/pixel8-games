@@ -1,13 +1,13 @@
-use rico8::{Context, SfxId, SpriteId};
+use rico8::{Body, Context, SfxId, SpriteId};
 
 use crate::{
-    common::{Direction, Position, Size, Sprite},
+    common::{Direction, Size, Sprite},
     entity::{self, Entity},
 };
 
 #[derive(Debug)]
 pub struct Bullet {
-    pos: Position,
+    body: Body,
     entity_type: entity::Type,
 }
 
@@ -21,22 +21,22 @@ impl Bullet {
     }
 
     fn new(x: f32, y: f32, entity_type: entity::Type, ctx: &mut Context) -> Self {
-        ctx.sfx(SFX_ID);
+        //ctx.sfx(SFX_ID);
 
         Self {
-            pos: Position { x, y },
+            body: Body::new(x, y),
             entity_type,
         }
     }
 }
 
 impl Entity for Bullet {
-    fn position(&self) -> Position {
-        self.pos
+    fn body(&self) -> Body {
+        self.body
     }
 
-    fn position_mut(&mut self) -> &mut Position {
-        &mut self.pos
+    fn body_mut(&mut self) -> &mut Body {
+        &mut self.body
     }
 
     fn sprite(&self) -> Sprite {
