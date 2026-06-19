@@ -11,6 +11,14 @@ use rico8::*;
 
 use crate::{bullet::Bullet, entity::Entity, shooter::Shooter, the_lady::TheLady};
 
+rico8::game!(
+    Cart = Cart {
+        friendly_bullets: Vec::new(),
+
+        the_lady: TheLady::new(),
+    }
+);
+
 #[derive(Debug)]
 struct Cart {
     friendly_bullets: Vec<Bullet, MAX_FRIENDLY_BULLETS>,
