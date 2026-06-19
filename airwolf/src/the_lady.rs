@@ -97,6 +97,13 @@ impl Entity for TheLady {
 
         self.go(dir, SPEED);
     }
+
+    fn draw(&self, gfx: &mut rico8::Graphics) {
+        gfx.set_transparent_color(Color::BLACK, false);
+        gfx.set_transparent_color(Color::DARK_GREY, true);
+        self.draw_default(gfx);
+        gfx.reset_transparency();
+    }
 }
 
 const SPRITE_ID: SpriteId = SpriteId(1);
