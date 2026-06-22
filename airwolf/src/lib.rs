@@ -47,12 +47,23 @@ impl Cart {
         self.friendly_bullets = Vec::new();
         self.the_lady = TheLady::new();
         self.smap = ScrollingMap::new();
+        self.score = 0;
+        let playing_music = ctx
+            .music(MusicId(0))
+            .reserve_channels(
+                MusicChannel::Channel0 | MusicChannel::Channel1 | MusicChannel::Channel2,
+            )
+            .play()
+            .ok()
+            .or_else(|| {
+                logf!(ctx, "Failed to play the awesome theme music");
+
+                None
+            });
         self.scene = Scene::Game {
             start_time: ctx.time(),
+            playing_music,
         };
-        self.score = 0;
-        // FIXME: We probably need a channelmask like in pico8.
-        ctx.music(MusicId(0));
     }
 }
 
@@ -73,17 +84,21 @@ impl Game for Cart {
             })
         }
 
-        match self.scene {
+        match &mut self.scene {
             Scene::Start => {
                 self.start(ctx);
             }
-            Scene::GameOver { ts } if ctx.time() - ts > GAME_OVER_TIMEOUT => {
+            Scene::GameOver { ts } if ctx.time() - *ts > GAME_OVER_TIMEOUT => {
                 self.start(ctx);
             }
             Scene::GameOver { .. } => {}
-            Scene::Game { start_time } if ctx.time() - start_time > MUSIC_DURATION => {
-                // FIXME: fade-out like pico8 when rico8 supports it.
-                ctx.music_stop();
+            Scene::Game {
+                start_time,
+                playing_music,
+            } if playing_music.is_some() && ctx.time() - *start_time > MUSIC_DURATION => {
+                playing_music
+                    .take()
+                    .map(|p| p.fade_out(MUSIC_FAID_OUT_DURATION).stop());
             }
             Scene::Game { .. } => {}
         }
@@ -101,11 +116,16 @@ impl Game for Cart {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 enum Scene {
     Start,
-    Game { start_time: f32 },
-    GameOver { ts: f32 },
+    Game {
+        start_time: f32,
+        playing_music: Option<PlayingMusic>,
+    },
+    GameOver {
+        ts: f32,
+    },
 }
 
 const MAX_FRIENDLY_BULLETS: usize = 16;
@@ -113,3 +133,4 @@ const MAX_FRIENDLY_BULLETS: usize = 16;
 const GAME_OVER_TIMEOUT: f32 = 3.0;
 // 30 seconds.
 const MUSIC_DURATION: f32 = 30.0;
+const MUSIC_FAID_OUT_DURATION: u32 = 5000;
