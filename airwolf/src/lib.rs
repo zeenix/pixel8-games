@@ -3,6 +3,7 @@
 mod bullet;
 mod common;
 mod entity;
+mod rotor;
 mod scrolling_map;
 mod shooter;
 mod the_lady;

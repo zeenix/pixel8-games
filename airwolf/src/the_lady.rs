@@ -3,12 +3,15 @@ use rico8::{Body, Button, Color, Context, SpriteId, SCREEN_H, SCREEN_W};
 use crate::{
     common::{Direction, Position, Size, Sprite},
     entity::{self, Entity},
+    rotor::Rotor,
     shooter::{BulletProps, Shooter},
 };
 
 #[derive(Debug)]
 pub struct TheLady {
     body: Body,
+    main_rotor: Rotor,
+    tail_rotor: Rotor,
     last_bullet: f32,
 }
 
@@ -17,6 +20,8 @@ impl TheLady {
         // TODO: Rotors.
         Self {
             body: Body::new(STARTING_POSITION.x, STARTING_POSITION.y),
+            main_rotor: Rotor::new(MAIN_ROTOR_OFFSET, MAIN_ROTOR_LENGTH),
+            tail_rotor: Rotor::new(TAIL_ROTOR_OFFSET, TAIL_ROTOR_LENGTH),
             last_bullet: 0.0,
         }
     }
@@ -76,26 +81,32 @@ impl Entity for TheLady {
 
         let buttons = ctx.buttons_down();
         let dir = if buttons.contains(Button::UP_LEFT) && can_up_left {
-            Direction::UpLeft
+            Some(Direction::UpLeft)
         } else if buttons.contains(Button::UP_RIGHT) && can_up_right {
-            Direction::UpRight
+            Some(Direction::UpRight)
         } else if buttons.contains(Button::DOWN_LEFT) && can_down_left {
-            Direction::DownLeft
+            Some(Direction::DownLeft)
         } else if buttons.contains(Button::DOWN_RIGHT) && can_down_right {
-            Direction::DownRight
+            Some(Direction::DownRight)
         } else if buttons.contains(Button::Up) && can_up {
-            Direction::Up
+            Some(Direction::Up)
         } else if buttons.contains(Button::Down) && can_down {
-            Direction::Down
+            Some(Direction::Down)
         } else if buttons.contains(Button::Left) && can_left {
-            Direction::Left
+            Some(Direction::Left)
         } else if buttons.contains(Button::Right) && can_right {
-            Direction::Right
+            Some(Direction::Right)
         } else {
-            return;
+            None
         };
 
-        self.go(dir, SPEED);
+        if let Some(dir) = dir {
+            self.go(dir, SPEED);
+        }
+
+        let pos = self.body().draw_pos().into();
+        self.main_rotor.update(pos);
+        self.tail_rotor.update(pos);
     }
 
     fn draw(&self, gfx: &mut rico8::Graphics) {
@@ -103,6 +114,9 @@ impl Entity for TheLady {
         gfx.set_transparent_color(Color::DARK_GREY, true);
         self.draw_default(gfx);
         gfx.reset_transparency();
+
+        self.main_rotor.draw(gfx);
+        self.tail_rotor.draw(gfx);
     }
 }
 
@@ -111,5 +125,9 @@ const SIZE: Size = Size {
     width: 8.0,
     height: 8.0,
 };
+const MAIN_ROTOR_OFFSET: Position = Position { x: 4.5, y: 3.5 };
+const MAIN_ROTOR_LENGTH: f32 = 2.0;
+const TAIL_ROTOR_OFFSET: Position = Position { x: 4.0, y: 7.0 };
+const TAIL_ROTOR_LENGTH: f32 = 1.0;
 const STARTING_POSITION: Position = Position { x: 63.0, y: 111.0 };
 const SPEED: f32 = 0.7;
