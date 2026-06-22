@@ -55,12 +55,12 @@ impl Cart {
                 MusicChannel::Channel0 | MusicChannel::Channel1 | MusicChannel::Channel2,
             )
             .play()
-            .ok()
-            .or_else(|| {
-                logf!(ctx, "Failed to play the awesome theme music");
+            .map_err(|e| {
+                logf!(64; ctx, "Music failed: {e}");
 
-                None
-            });
+                e
+            })
+            .ok();
         self.scene = Scene::Game {
             start_time: ctx.time(),
             playing_music,
