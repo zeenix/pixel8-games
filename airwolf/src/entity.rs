@@ -2,7 +2,10 @@ use core::any::Any;
 
 use rico8::{Body, Context, Graphics, SCREEN_H};
 
-use crate::common::{Direction, Size, Sprite};
+use crate::{
+    common::{Direction, Size, Sprite},
+    Scene,
+};
 
 pub trait Entity: 'static {
     fn body(&self) -> Body;
@@ -17,13 +20,13 @@ pub trait Entity: 'static {
         x >= SCREEN_H as f32 || x < 0.0 || y >= SCREEN_H as f32 || y < 0.0
     }
 
-    fn update(&mut self, ctx: &mut Context);
+    fn update(&mut self, ctx: &mut Context, scene: &Scene);
 
-    fn draw(&self, gfx: &mut Graphics) {
-        self.draw_default(gfx);
+    fn draw(&self, gfx: &mut Graphics, scene: &Scene) {
+        self.draw_default(gfx, scene);
     }
 
-    fn draw_default(&self, gfx: &mut Graphics) {
+    fn draw_default(&self, gfx: &mut Graphics, scene: &Scene) {
         let (x, y) = self.body().draw_pos();
         let size = self.sprite().size_in_blocks();
 

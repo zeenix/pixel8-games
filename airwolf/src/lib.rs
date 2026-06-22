@@ -71,10 +71,10 @@ impl Cart {
 impl Game for Cart {
     fn update(&mut self, ctx: &mut Context) {
         self.smap.update(ctx);
-        self.the_lady.update(ctx);
+        self.the_lady.update(ctx, &self.scene);
 
         self.friendly_bullets.retain_mut(|b| {
-            b.update(ctx);
+            b.update(ctx, &self.scene);
 
             !b.outside()
         });
@@ -109,16 +109,16 @@ impl Game for Cart {
         gfx.clear(Color::BLACK);
         self.smap.draw(gfx);
 
-        self.the_lady.draw(gfx);
+        self.the_lady.draw(gfx, &self.scene);
 
         for b in &self.friendly_bullets {
-            b.draw(gfx);
+            b.draw(gfx, &self.scene);
         }
     }
 }
 
 #[derive(Debug)]
-enum Scene {
+pub(crate) enum Scene {
     Start,
     Game {
         start_time: f32,

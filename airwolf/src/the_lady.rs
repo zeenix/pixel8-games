@@ -5,6 +5,7 @@ use crate::{
     entity::{self, Entity},
     rotor::Rotor,
     shooter::{BulletProps, Shooter},
+    Scene,
 };
 
 #[derive(Debug)]
@@ -23,6 +24,45 @@ impl TheLady {
             main_rotor: Rotor::new(MAIN_ROTOR_OFFSET, MAIN_ROTOR_LENGTH),
             tail_rotor: Rotor::new(TAIL_ROTOR_OFFSET, TAIL_ROTOR_LENGTH),
             last_bullet: 0.0,
+        }
+    }
+
+    fn move_it(&mut self, ctx: &mut Context) {
+        let (x, y) = self.body.draw_pos();
+        let Size { width, height } = self.sprite().size;
+
+        let can_left = x > -1.0;
+        let can_right = x + width < SCREEN_W as f32 - 2.0;
+        let can_up = y > 0.0;
+        let can_down = y + height < SCREEN_H as f32;
+        let can_up_left = can_left && can_up;
+        let can_down_left = can_left && can_down;
+        let can_up_right = can_right && can_up;
+        let can_down_right = can_right && can_down;
+
+        let buttons = ctx.buttons_down();
+        let dir = if buttons.contains(Button::UP_LEFT) && can_up_left {
+            Some(Direction::UpLeft)
+        } else if buttons.contains(Button::UP_RIGHT) && can_up_right {
+            Some(Direction::UpRight)
+        } else if buttons.contains(Button::DOWN_LEFT) && can_down_left {
+            Some(Direction::DownLeft)
+        } else if buttons.contains(Button::DOWN_RIGHT) && can_down_right {
+            Some(Direction::DownRight)
+        } else if buttons.contains(Button::Up) && can_up {
+            Some(Direction::Up)
+        } else if buttons.contains(Button::Down) && can_down {
+            Some(Direction::Down)
+        } else if buttons.contains(Button::Left) && can_left {
+            Some(Direction::Left)
+        } else if buttons.contains(Button::Right) && can_right {
+            Some(Direction::Right)
+        } else {
+            None
+        };
+
+        if let Some(dir) = dir {
+            self.go(dir, SPEED);
         }
     }
 }
@@ -66,42 +106,9 @@ impl Entity for TheLady {
         entity::Type::Protoganist
     }
 
-    fn update(&mut self, ctx: &mut Context) {
-        let (x, y) = self.body.draw_pos();
-        let Size { width, height } = self.sprite().size;
-
-        let can_left = x > -1.0;
-        let can_right = x + width < SCREEN_W as f32 - 2.0;
-        let can_up = y > 0.0;
-        let can_down = y + height < SCREEN_H as f32;
-        let can_up_left = can_left && can_up;
-        let can_down_left = can_left && can_down;
-        let can_up_right = can_right && can_up;
-        let can_down_right = can_right && can_down;
-
-        let buttons = ctx.buttons_down();
-        let dir = if buttons.contains(Button::UP_LEFT) && can_up_left {
-            Some(Direction::UpLeft)
-        } else if buttons.contains(Button::UP_RIGHT) && can_up_right {
-            Some(Direction::UpRight)
-        } else if buttons.contains(Button::DOWN_LEFT) && can_down_left {
-            Some(Direction::DownLeft)
-        } else if buttons.contains(Button::DOWN_RIGHT) && can_down_right {
-            Some(Direction::DownRight)
-        } else if buttons.contains(Button::Up) && can_up {
-            Some(Direction::Up)
-        } else if buttons.contains(Button::Down) && can_down {
-            Some(Direction::Down)
-        } else if buttons.contains(Button::Left) && can_left {
-            Some(Direction::Left)
-        } else if buttons.contains(Button::Right) && can_right {
-            Some(Direction::Right)
-        } else {
-            None
-        };
-
-        if let Some(dir) = dir {
-            self.go(dir, SPEED);
+    fn update(&mut self, ctx: &mut Context, scene: &Scene) {
+        if matches!(scene, Scene::Game { .. }) {
+            self.move_it(ctx);
         }
 
         let pos = self.body().draw_pos().into();
@@ -109,10 +116,10 @@ impl Entity for TheLady {
         self.tail_rotor.update(pos);
     }
 
-    fn draw(&self, gfx: &mut rico8::Graphics) {
+    fn draw(&self, gfx: &mut rico8::Graphics, scene: &Scene) {
         gfx.set_transparent_color(Color::BLACK, false);
         gfx.set_transparent_color(Color::DARK_GREY, true);
-        self.draw_default(gfx);
+        self.draw_default(gfx, scene);
         gfx.reset_transparency();
 
         self.main_rotor.draw(gfx);
