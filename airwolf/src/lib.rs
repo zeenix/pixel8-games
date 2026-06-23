@@ -140,10 +140,10 @@ impl Game for Cart {
     }
 }
 
-fn retain_fn<E: Entity>(b: &mut E, ctx: &mut Context, state: &CartState) -> bool {
-    b.update(ctx, state);
+fn retain_fn<E: Entity>(entity: &mut E, ctx: &mut Context, state: &CartState) -> bool {
+    entity.update(ctx, state);
 
-    !b.outside()
+    !entity.outside()
 }
 
 #[derive(Debug, Clone)]
