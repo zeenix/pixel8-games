@@ -94,15 +94,14 @@ impl Cart {
         self.enemy_aircrafts.retain_mut(|aircraft| {
             debug_assert!(matches!(aircraft.entity_type(), entity::Type::Enemy));
             aircraft.handle_collision(&mut self.the_lady, ctx);
+            if matches!(self.scene, Scene::Game { .. }) {
+                aircraft.shoot(ctx, &mut self.bullets);
+            }
 
             retain_fn(aircraft, ctx, &state)
         });
 
-        if let Some(b) = self.the_lady.shoot(ctx) {
-            self.bullets.push(b).unwrap_or_else(|_| {
-                logf!(ctx, "Err: Too many bullets: {}", MAX_BULLETS);
-            })
-        }
+        self.the_lady.shoot(ctx, &mut self.bullets);
 
         if matches!(self.scene, Scene::Game { .. }) {
             // Spawn an enemy aircraft every 1-4 seconds in game mode.

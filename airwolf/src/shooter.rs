@@ -1,4 +1,5 @@
-use rico8::Context;
+use heapless::VecView;
+use rico8::{logf, Context};
 
 use crate::{bullet::Bullet, entity::Entity};
 
@@ -11,13 +12,12 @@ pub trait Shooter: Entity {
     /// Reset the time last bullet was fired by this shooter to the current time.
     fn reset_last_bullet(&mut self, ctx: &Context);
 
-    #[must_use = "Why create a bullet just to drop it?"]
-    fn shoot(&mut self, ctx: &mut Context) -> Option<Bullet> {
+    fn shoot(&mut self, ctx: &mut Context, bullets: &mut VecView<Bullet>) {
         if !self.alive()
             || !self.bullet_cool_down(ctx)
             || !self.is_enemy() && !ctx.btn(rico8::Button::O)
         {
-            return None;
+            return;
         }
 
         let bprops = self.bullet_props();
@@ -31,7 +31,9 @@ pub trait Shooter: Entity {
         };
         self.reset_last_bullet(ctx);
 
-        Some(bullet)
+        bullets.push(bullet).unwrap_or_else(|_| {
+            logf!(ctx, "Err: Too many bullets: {}", super::MAX_BULLETS);
+        })
     }
 
     /// Returns true if there has been sufficient time since the last bullet.
