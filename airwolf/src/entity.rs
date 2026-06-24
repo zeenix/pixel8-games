@@ -1,9 +1,11 @@
 use core::any::Any;
 
-use rico8::{Body, Context, Graphics, SCREEN_H};
+use heapless::VecView;
+use rico8::{logf, Body, Context, Graphics, SCREEN_H};
 
 use crate::{
     common::{Direction, Size, Sprite},
+    explosion::Explosion,
     CartState,
 };
 
@@ -26,6 +28,7 @@ pub trait Entity: 'static {
 
     /// Wether this entity is still alive.
     fn alive(&self) -> bool;
+    fn alive_mut(&mut self) -> &mut bool;
 
     fn update(&mut self, ctx: &mut Context, state: &CartState);
 
@@ -67,13 +70,18 @@ pub trait Entity: 'static {
     }
 
     /// Check for collision and act on it.
-    fn handle_collision(&mut self, other: &mut dyn Entity, ctx: &mut Context) {
+    fn handle_collision(
+        &mut self,
+        other: &mut dyn Entity,
+        ctx: &mut Context,
+        explosions: &mut VecView<Explosion>,
+    ) {
         if !self.collided(other) {
             return;
         }
 
-        self.hit(ctx);
-        other.hit(ctx);
+        self.hit(ctx, explosions);
+        other.hit(ctx, explosions);
     }
 
     fn collided(&self, other: &dyn Entity) -> bool {
@@ -101,7 +109,16 @@ pub trait Entity: 'static {
             && our_y + our_height > other_y
     }
 
-    fn hit(&mut self, ctx: &mut Context);
+    fn hit(&mut self, ctx: &mut Context, explosions: &mut VecView<Explosion>);
+
+    fn destroy(&mut self, ctx: &mut Context, explosions: &mut VecView<Explosion>) {
+        *self.alive_mut() = false;
+        explosions
+            .push(Explosion::new(self.body().pos().into(), ctx))
+            .unwrap_or_else(|_| {
+                logf!(ctx, "Err: Too many explosions: {}", super::MAX_EXPLOSIONS);
+            });
+    }
 
     fn is_enemy(&self) -> bool {
         matches!(self.entity_type(), Type::Enemy | Type::EnemyBullet)

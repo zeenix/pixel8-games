@@ -1,8 +1,10 @@
+use heapless::VecView;
 use rico8::{Body, Context, SfxId, SpriteId};
 
 use crate::{
     common::{Direction, Size, Sprite},
     entity::{self, Entity},
+    explosion::Explosion,
     CartState,
 };
 
@@ -63,6 +65,9 @@ impl Entity for Bullet {
     fn alive(&self) -> bool {
         self.alive
     }
+    fn alive_mut(&mut self) -> &mut bool {
+        &mut self.alive
+    }
 
     fn update(&mut self, _ctx: &mut Context, _state: &CartState) {
         let dir = if self.is_enemy() {
@@ -74,8 +79,8 @@ impl Entity for Bullet {
         self.go(dir, SPEED);
     }
 
-    fn hit(&mut self, _ctx: &mut Context) {
-        self.alive = false;
+    fn hit(&mut self, ctx: &mut Context, explosions: &mut VecView<Explosion>) {
+        self.destroy(ctx, explosions);
     }
 }
 

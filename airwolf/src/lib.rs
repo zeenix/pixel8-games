@@ -4,6 +4,7 @@ mod bullet;
 mod common;
 mod enemy_aircraft;
 mod entity;
+mod explosion;
 mod rotor;
 mod scrolling_map;
 mod shooter;
@@ -14,7 +15,7 @@ use rico8::*;
 
 use crate::{
     bullet::Bullet, common::Position, enemy_aircraft::EnemyAircraft, entity::Entity,
-    scrolling_map::ScrollingMap, shooter::Shooter, the_lady::TheLady,
+    explosion::Explosion, scrolling_map::ScrollingMap, shooter::Shooter, the_lady::TheLady,
 };
 
 rico8::game!(Cart = Cart::new());
@@ -22,6 +23,7 @@ rico8::game!(Cart = Cart::new());
 #[derive(Debug)]
 struct Cart {
     bullets: Vec<Bullet, MAX_BULLETS>,
+    explosions: Vec<Explosion, MAX_EXPLOSIONS>,
 
     the_lady: TheLady,
     enemy_aircrafts: Vec<EnemyAircraft, MAX_ENEMY_AIRCRAFTS>,
@@ -37,6 +39,7 @@ impl Cart {
     fn new() -> Self {
         Self {
             bullets: Vec::new(),
+            explosions: Vec::new(),
             the_lady: TheLady::new(),
             enemy_aircrafts: Vec::new(),
             last_enemy_ts: 0.0,
@@ -53,6 +56,7 @@ impl Cart {
         }
 
         self.bullets.clear();
+        self.explosions.clear();
         self.enemy_aircrafts.clear();
         self.the_lady = TheLady::new();
         self.smap = ScrollingMap::new();
@@ -80,10 +84,12 @@ impl Cart {
         let state = self.state();
         self.bullets.retain_mut(|bullet| {
             match bullet.entity_type() {
-                entity::Type::EnemyBullet => bullet.handle_collision(&mut self.the_lady, ctx),
+                entity::Type::EnemyBullet => {
+                    bullet.handle_collision(&mut self.the_lady, ctx, &mut self.explosions)
+                }
                 entity::Type::FriendlyBullet => {
                     for aircraft in &mut self.enemy_aircrafts {
-                        bullet.handle_collision(aircraft, ctx);
+                        bullet.handle_collision(aircraft, ctx, &mut self.explosions);
                     }
                 }
                 _ => unreachable!("unknown bullet type encountered"),
@@ -93,12 +99,16 @@ impl Cart {
         });
         self.enemy_aircrafts.retain_mut(|aircraft| {
             debug_assert!(matches!(aircraft.entity_type(), entity::Type::Enemy));
-            aircraft.handle_collision(&mut self.the_lady, ctx);
+            aircraft.handle_collision(&mut self.the_lady, ctx, &mut self.explosions);
             if matches!(self.scene, Scene::Game { .. }) {
                 aircraft.shoot(ctx, &mut self.bullets);
             }
 
             retain_fn(aircraft, ctx, &state)
+        });
+        self.explosions.retain_mut(|explosion| {
+            explosion.update(ctx);
+            !explosion.disappeared()
         });
 
         self.the_lady.shoot(ctx, &mut self.bullets);
@@ -175,6 +185,7 @@ impl Game for Cart {
         self.the_lady.draw(gfx, &self.state());
 
         self.bullets.iter().for_each(|b| b.draw(gfx, &self.state()));
+        self.explosions.iter().for_each(|e| e.draw(gfx));
         self.enemy_aircrafts
             .iter()
             .for_each(|b| b.draw(gfx, &self.state()));
@@ -220,6 +231,7 @@ pub(crate) enum Scene {
 
 const MAX_BULLETS: usize = 64;
 const MAX_ENEMY_AIRCRAFTS: usize = 16;
+const MAX_EXPLOSIONS: usize = MAX_ENEMY_AIRCRAFTS + 8;
 // 3 seconds.
 const GAME_OVER_TIMEOUT: f32 = 3.0;
 const GAME_OVER_MSG_POS: Position = Position { x: 30.0, y: 70.0 };

@@ -1,8 +1,10 @@
+use heapless::VecView;
 use rico8::{Body, Button, Color, Context, SfxId, SpriteId, SCREEN_H, SCREEN_W};
 
 use crate::{
     common::{Direction, Position, Size, Sprite},
     entity::{self, Entity},
+    explosion::Explosion,
     rotor::Rotor,
     shooter::{BulletProps, Shooter},
     CartState, Scene,
@@ -110,6 +112,9 @@ impl Entity for TheLady {
     fn alive(&self) -> bool {
         self.alive
     }
+    fn alive_mut(&mut self) -> &mut bool {
+        &mut self.alive
+    }
 
     fn update(&mut self, ctx: &mut Context, state: &CartState) {
         if !self.alive {
@@ -138,9 +143,9 @@ impl Entity for TheLady {
         self.tail_rotor.draw(gfx);
     }
 
-    fn hit(&mut self, ctx: &mut Context) {
+    fn hit(&mut self, ctx: &mut Context, explosions: &mut VecView<Explosion>) {
+        self.destroy(ctx, explosions);
         ctx.sfx(DESTROY_SFX);
-        self.alive = false;
     }
 }
 
