@@ -119,7 +119,9 @@ impl Cart {
     }
 
     fn end_game(&mut self, ctx: &mut Context) {
-        self.scene = Scene::GameOver { ts: ctx.time() };
+        self.scene = Scene::GameOver {
+            ts: Some(ctx.time()),
+        };
         self.playing_music.take().map(|p| p.stop());
         self.smap.stop_scrolling();
     }
@@ -139,8 +141,18 @@ impl Game for Cart {
 
         match self.scene {
             Scene::Start => self.start(ctx),
-            Scene::GameOver { ts } if ctx.time() - ts > GAME_OVER_TIMEOUT => self.start(ctx),
-            Scene::GameOver { .. } => self.running_update(ctx),
+            Scene::GameOver { ts: Some(ts) } if ctx.time() - ts > GAME_OVER_TIMEOUT => {
+                self.scene = Scene::GameOver { ts: None };
+                self.start(ctx);
+            }
+            Scene::GameOver { ts: Some(_) } => self.running_update(ctx),
+            Scene::GameOver { ts: None } => {
+                // Game's been over and we already waited for `GAME_OVER_TIMEOUT` after that.
+                // Keep updating the scene, so animations continue and continue to try starting the
+                // game.
+                self.running_update(ctx);
+                self.start(ctx);
+            }
             Scene::Game { start_time } => {
                 self.running_update(ctx);
 
@@ -167,6 +179,19 @@ impl Game for Cart {
         self.enemy_aircrafts
             .iter()
             .for_each(|b| b.draw(gfx, &self.state()));
+
+        let msg = match self.scene {
+            Scene::Start => Some("Press O to start"),
+            Scene::GameOver { ts: None } => {
+                // `ts` being `None` means we already waited for `GAME_OVER_TIMEOUT` already.
+                Some("Press O to restart")
+            }
+            _ => None,
+        };
+        if let Some(msg) = msg {
+            let Position { x, y } = GAME_OVER_MSG_POS;
+            printf!(gfx, x, y, GAME_OVER_MSG_COLOR, "{}", msg);
+        }
     }
 }
 
@@ -185,14 +210,21 @@ pub(crate) struct CartState {
 #[derive(Debug, Clone)]
 pub(crate) enum Scene {
     Start,
-    Game { start_time: f32 },
-    GameOver { ts: f32 },
+    Game {
+        start_time: f32,
+    },
+    GameOver {
+        /// When the game was over. It's set to `None` after `GAME_OVER_TIMEOUT`.
+        ts: Option<f32>,
+    },
 }
 
 const MAX_BULLETS: usize = 64;
 const MAX_ENEMY_AIRCRAFTS: usize = 16;
 // 3 seconds.
 const GAME_OVER_TIMEOUT: f32 = 3.0;
+const GAME_OVER_MSG_POS: Position = Position { x: 30.0, y: 70.0 };
+const GAME_OVER_MSG_COLOR: Color = Color::WHITE;
 // 30 seconds.
 const MUSIC_DURATION: f32 = 30.0;
 const MUSIC_FAID_OUT_DURATION: u32 = 5000;
