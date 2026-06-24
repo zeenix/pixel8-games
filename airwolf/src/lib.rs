@@ -52,7 +52,7 @@ impl Cart {
             return;
         }
 
-        self.bullets = Vec::new();
+        self.bullets.clear();
         self.the_lady = TheLady::new();
         self.smap = ScrollingMap::new();
         self.score = 0;
