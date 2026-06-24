@@ -1,4 +1,4 @@
-use rico8::{Body, Button, Color, Context, SfxId, SpriteId, SCREEN_H, SCREEN_W};
+use rico8::{Body, Context, SfxId, SpriteId, SCREEN_H, SCREEN_W};
 
 use crate::{
     common::{Direction, Position, Size, Sprite},
