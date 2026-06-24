@@ -112,6 +112,9 @@ impl Entity for TheLady {
     }
 
     fn update(&mut self, ctx: &mut Context, state: &CartState) {
+        if !self.alive {
+            return;
+        }
         if matches!(state.scene, Scene::Game { .. }) {
             self.move_it(ctx);
         }
@@ -122,6 +125,10 @@ impl Entity for TheLady {
     }
 
     fn draw(&self, gfx: &mut rico8::Graphics, state: &CartState) {
+        if !self.alive {
+            return;
+        }
+
         gfx.set_transparent_color(Color::BLACK, false);
         gfx.set_transparent_color(Color::DARK_GREY, true);
         self.draw_default(gfx, state);
