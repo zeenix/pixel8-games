@@ -73,14 +73,8 @@ impl Cart {
         };
     }
 
-    fn update_during_game(&mut self, ctx: &mut Context, start_time: f32) {
+    fn running_update(&mut self, ctx: &mut Context) {
         let time = ctx.time();
-
-        if self.playing_music.is_some() && time - start_time > MUSIC_DURATION {
-            self.playing_music
-                .take()
-                .map(|p| p.fade_out(MUSIC_FAID_OUT_DURATION).stop());
-        }
 
         let state = self.state();
         self.bullets.retain_mut(|bullet| {
@@ -140,12 +134,6 @@ impl Game for Cart {
         self.smap.update(ctx);
         self.the_lady.update(ctx, &self.state());
 
-        if !self.the_lady.alive() {
-            self.end_game(ctx);
-
-            return;
-        }
-
         match self.scene {
             Scene::Start => {
                 self.start(ctx);
@@ -153,8 +141,22 @@ impl Game for Cart {
             Scene::GameOver { ts } if ctx.time() - ts > GAME_OVER_TIMEOUT => {
                 self.start(ctx);
             }
-            Scene::GameOver { .. } => {}
-            Scene::Game { start_time } => self.update_during_game(ctx, start_time),
+            Scene::GameOver { .. } => self.running_update(ctx),
+            Scene::Game { start_time } => {
+                self.running_update(ctx);
+
+                if self.playing_music.is_some() && ctx.time() - start_time > MUSIC_DURATION {
+                    self.playing_music
+                        .take()
+                        .map(|p| p.fade_out(MUSIC_FAID_OUT_DURATION).stop());
+                }
+            }
+        }
+
+        if !self.the_lady.alive() {
+            self.end_game(ctx);
+
+            return;
         }
     }
 
