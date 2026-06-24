@@ -152,13 +152,11 @@ impl Game for Cart {
                         .take()
                         .map(|p| p.fade_out(MUSIC_FAID_OUT_DURATION).stop());
                 }
+
+                if !self.the_lady.alive() {
+                    self.end_game(ctx);
+                }
             }
-        }
-
-        if !self.the_lady.alive() {
-            self.end_game(ctx);
-
-            return;
         }
     }
 
