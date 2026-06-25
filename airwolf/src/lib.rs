@@ -32,6 +32,7 @@ struct Cart {
     smap: ScrollingMap,
     scene: Scene,
     score: u32,
+    high_score: u32,
     playing_music: Option<PlayingMusic>,
 }
 
@@ -46,6 +47,7 @@ impl Cart {
             smap: ScrollingMap::new(),
             scene: Scene::Start,
             score: 0,
+            high_score: 0,
             playing_music: None,
         }
     }
@@ -90,6 +92,11 @@ impl Cart {
                 entity::Type::FriendlyBullet => {
                     for aircraft in &mut self.enemy_aircrafts {
                         bullet.handle_collision(aircraft, ctx, &mut self.explosions);
+                        if !aircraft.alive() {
+                            self.score += DESTORY_SCORE_BUMP as u32;
+                        } else if aircraft.outside() {
+                            self.score += LET_GO_SCORE_BUMP as u32;
+                        }
                     }
                 }
                 _ => unreachable!("unknown bullet type encountered"),
@@ -133,12 +140,32 @@ impl Cart {
         };
         self.playing_music.take().map(|p| p.stop());
         self.smap.stop_scrolling();
+        if self.score > self.high_score {
+            self.high_score = self.score;
+        }
     }
 
     fn state(&self) -> CartState {
         CartState {
             scene: self.scene.clone(),
             protoganist_pos: self.the_lady.body().draw_pos().into(),
+        }
+    }
+
+    fn show_score(&self, gfx: &mut Graphics) {
+        if matches!(self.scene, Scene::Game { .. } | Scene::GameOver { .. }) {
+            printf!(gfx, SCORE_POS.x, SCORE_POS.y, SCORE_COLOR, "{}", self.score);
+        }
+
+        if self.high_score > 0 {
+            printf!(
+                gfx,
+                HIGH_SCORE_POS.x,
+                HIGH_SCORE_POS.y,
+                SCORE_COLOR,
+                "{:5}",
+                self.high_score
+            );
         }
     }
 }
@@ -202,6 +229,8 @@ impl Game for Cart {
             let Position { x, y } = GAME_OVER_MSG_POS;
             printf!(gfx, x, y, GAME_OVER_MSG_COLOR, "{}", msg);
         }
+
+        self.show_score(gfx);
     }
 }
 
@@ -239,3 +268,17 @@ const GAME_OVER_MSG_COLOR: Color = Color::WHITE;
 // 30 seconds.
 const MUSIC_DURATION: f32 = 30.0;
 const MUSIC_FAID_OUT_DURATION: u32 = 5000;
+// More points for letting an enemy aircraft go.
+const LET_GO_SCORE_BUMP: u8 = 20;
+const DESTORY_SCORE_BUMP: u8 = 10;
+const SCORE_POS: Position = Position {
+    x: 1.0,
+    y: (SCREEN_H - 8) as f32,
+};
+const HIGH_SCORE_POS: Position = Position {
+    // 5 = length of the string printed.
+    // 4 = pixels of each character.
+    x: (SCREEN_W - 5 * 4) as f32,
+    y: (SCREEN_H - 8) as f32,
+};
+const SCORE_COLOR: Color = Color::WHITE;
