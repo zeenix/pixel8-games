@@ -94,8 +94,6 @@ impl Cart {
                         bullet.handle_collision(aircraft, ctx, &mut self.explosions);
                         if !aircraft.alive() {
                             self.score += DESTORY_SCORE_BUMP as u32;
-                        } else if aircraft.outside() {
-                            self.score += LET_GO_SCORE_BUMP as u32;
                         }
                     }
                 }
@@ -110,8 +108,12 @@ impl Cart {
             if matches!(self.scene, Scene::Game { .. }) {
                 aircraft.shoot(ctx, &mut self.bullets);
             }
+            let retain = retain_fn(aircraft, ctx, &state);
+            if aircraft.outside() {
+                self.score += LET_GO_SCORE_BUMP as u32;
+            }
 
-            retain_fn(aircraft, ctx, &state)
+            retain
         });
         self.explosions.retain_mut(|explosion| {
             explosion.update(ctx);
