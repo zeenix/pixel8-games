@@ -45,7 +45,7 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 [[package]]
 name = "rico8"
 version = "0.1.0"
-source = "git+https://github.com/zeenix/rico8#ea7a30902d7e12f27e8c3541254f8ec2b50d3b7f"
+source = "git+https://github.com/zeenix/rico8#93a538b0017e3424dea07eebaf1d6e7f6f2f7851"
 
 [[package]]
 name = "stable_deref_trait"

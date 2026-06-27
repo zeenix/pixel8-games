@@ -47,7 +47,7 @@ impl Rotor {
     pub fn draw(&self, gfx: &mut rico8::Graphics) {
         let (Position { x: x0, y: y0 }, Position { x: x1, y: y1 }) = self.edges_pos;
 
-        gfx.line(x0 as i32, y0 as i32, x1 as i32, y1 as i32, COLOR);
+        gfx.line(x0 as i16, y0 as i16, x1 as i16, y1 as i16, COLOR);
     }
 }
 

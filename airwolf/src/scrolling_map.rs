@@ -35,7 +35,7 @@ impl ScrollingMap {
     pub fn draw(&self, gfx: &mut Graphics) {
         gfx.clear(Color::DARK_GREY);
 
-        let scroll = self.scroll as i32;
+        let scroll = self.scroll as i16;
         for i in 0..=7 {
             let tile_x = i * 16;
             let map_y = i * -SCREEN_HEIGHT_TWICE + scroll;
@@ -46,5 +46,5 @@ impl ScrollingMap {
     }
 }
 
-const SCREEN_HEIGHT_TWICE: i32 = SCREEN_HEIGHT as i32 * 2;
+const SCREEN_HEIGHT_TWICE: i16 = SCREEN_HEIGHT as i16 * 2;
 const SCROLL_SPEED: f32 = 0.3;

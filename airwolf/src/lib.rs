@@ -156,8 +156,8 @@ impl Cart {
         if matches!(self.scene, Scene::Game { .. } | Scene::GameOver { .. }) {
             printf!(
                 gfx,
-                SCORE_POS.x as i32,
-                SCORE_POS.y as i32,
+                SCORE_POS.x as i16,
+                SCORE_POS.y as i16,
                 SCORE_COLOR,
                 "{}",
                 self.score
@@ -167,8 +167,8 @@ impl Cart {
         if self.high_score > 0 {
             printf!(
                 gfx,
-                HIGH_SCORE_POS.x as i32,
-                HIGH_SCORE_POS.y as i32,
+                HIGH_SCORE_POS.x as i16,
+                HIGH_SCORE_POS.y as i16,
                 SCORE_COLOR,
                 "{:5}",
                 self.high_score
@@ -234,7 +234,7 @@ impl Game for Cart {
         };
         if let Some(msg) = msg {
             let Position { x, y } = GAME_OVER_MSG_POS;
-            printf!(gfx, x as i32, y as i32, GAME_OVER_MSG_COLOR, "{}", msg);
+            printf!(gfx, x as i16, y as i16, GAME_OVER_MSG_COLOR, "{}", msg);
         }
 
         self.show_score(gfx);

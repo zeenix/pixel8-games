@@ -15,8 +15,8 @@ impl From<(f32, f32)> for Position {
     }
 }
 
-impl From<(i32, i32)> for Position {
-    fn from(value: (i32, i32)) -> Self {
+impl From<(i16, i16)> for Position {
+    fn from(value: (i16, i16)) -> Self {
         Self {
             x: value.0 as f32,
             y: value.1 as f32,

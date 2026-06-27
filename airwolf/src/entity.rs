@@ -44,8 +44,8 @@ pub trait Entity: 'static {
             self.sprite().id,
             x,
             y,
-            size.width as i32,
-            size.height as i32,
+            size.width as u16,
+            size.height as u16,
             false,
             false,
         )

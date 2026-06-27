@@ -61,10 +61,10 @@ impl Explosion {
                  radius,
                  ..
              }| {
-                let x = self.pos.x as i32 + *x_offset as i32;
-                let y = self.pos.y as i32 + *y_offset as i32;
+                let x = self.pos.x as i16 + *x_offset as i16;
+                let y = self.pos.y as i16 + *y_offset as i16;
                 let radius = *radius as f32 / u8::MAX as f32 * 2.0;
-                gfx.circle_fill(x, y, radius as u32, SPARK_COLOR);
+                gfx.circle_fill(x, y, radius as u16, SPARK_COLOR);
             },
         );
     }
