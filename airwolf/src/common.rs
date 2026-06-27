@@ -36,15 +36,6 @@ pub struct Sprite {
     pub size: Size,
 }
 
-impl Sprite {
-    pub fn size_in_blocks(&self) -> Size {
-        Size {
-            width: self.size.width / 8.0,
-            height: self.size.height / 8.0,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum Direction {
     Left,

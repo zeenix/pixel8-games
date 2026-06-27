@@ -19,7 +19,7 @@ pub trait Entity: 'static {
     fn outside(&self) -> bool {
         let (x, y) = self.body().draw_pos();
         let (x, y) = (x as f32, y as f32);
-        let size = self.sprite().size_in_blocks();
+        let size = self.sprite().size;
 
         x >= SCREEN_HEIGHT as f32
             || (x + size.width) < 0.0
