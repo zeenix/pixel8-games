@@ -159,4 +159,4 @@ const TAIL_ROTOR_OFFSET: Position = Position { x: 4, y: 7 };
 const TAIL_ROTOR_LENGTH: NonZeroU8 = unsafe { NonZeroU8::new_unchecked(2) };
 const STARTING_POSITION: Position = Position { x: 63, y: 111 };
 const SPEED: f32 = 0.7;
-const DESTROY_SFX: SfxId = SfxId(1);
+const DESTROY_SFX: SfxId = SfxId::new(1).unwrap();

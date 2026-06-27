@@ -64,10 +64,8 @@ impl Cart {
         self.smap = ScrollingMap::new();
         self.score = 0;
         self.playing_music = ctx
-            .music(MusicId(0))
-            .reserve_channels(
-                MusicChannel::Channel0 | MusicChannel::Channel1 | MusicChannel::Channel2,
-            )
+            .music(MUSIC_ID)
+            .reserve_channels(Channel::Channel0 | Channel::Channel1 | Channel::Channel2)
             .play()
             .map_err(|e| {
                 logf!(64; ctx, "Music failed: {e}");
@@ -291,3 +289,4 @@ const HIGH_SCORE_POS: Position = Position {
     y: (SCREEN_HEIGHT as i16 - 8),
 };
 const SCORE_COLOR: Color = Color::WHITE;
+const MUSIC_ID: MusicId = MusicId::new(0).unwrap();

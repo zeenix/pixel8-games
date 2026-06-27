@@ -89,4 +89,4 @@ const FRIENDLY_SIZE: Size = unsafe { Size::new_unchecked(8, 8) };
 const ENEMY_SPRITE_ID: SpriteId = SpriteId(65);
 const ENEMY_SIZE: Size = unsafe { Size::new_unchecked(1, 7) };
 const SPEED: f32 = 2.0;
-const SFX_ID: SfxId = SfxId(0);
+const SFX_ID: SfxId = SfxId::new(0).unwrap();
