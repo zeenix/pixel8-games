@@ -1,7 +1,7 @@
 use core::num::NonZeroU8;
 
 use heapless::VecView;
-use rico8::{Body, Button, Color, Context, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH};
+use pixel8::{Body, Button, Color, Context, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH};
 
 use crate::{
     common::{Direction, Position, Size, Sprite},
@@ -131,7 +131,7 @@ impl Entity for TheLady {
         self.tail_rotor.update(pos);
     }
 
-    fn draw(&self, gfx: &mut rico8::Graphics, state: &CartState) {
+    fn draw(&self, gfx: &mut pixel8::Graphics, state: &CartState) {
         if !self.alive {
             return;
         }

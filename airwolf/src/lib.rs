@@ -11,14 +11,14 @@ mod shooter;
 mod the_lady;
 
 use heapless::Vec;
-use rico8::*;
+use pixel8::*;
 
 use crate::{
     bullet::Bullet, common::Position, enemy_aircraft::EnemyAircraft, entity::Entity,
     explosion::Explosion, scrolling_map::ScrollingMap, shooter::Shooter, the_lady::TheLady,
 };
 
-rico8::game!(Cart = Cart::new());
+pixel8::game!(Cart = Cart::new());
 
 #[derive(Debug)]
 struct Cart {

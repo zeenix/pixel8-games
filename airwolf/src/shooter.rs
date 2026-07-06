@@ -1,5 +1,5 @@
 use heapless::VecView;
-use rico8::{logf, Context};
+use pixel8::{logf, Context};
 
 use crate::{bullet::Bullet, entity::Entity};
 
@@ -15,7 +15,7 @@ pub trait Shooter: Entity {
     fn shoot(&mut self, ctx: &mut Context, bullets: &mut VecView<Bullet>) {
         if !self.alive()
             || !self.bullet_cool_down(ctx)
-            || !self.is_enemy() && !ctx.btn(rico8::Button::O)
+            || !self.is_enemy() && !ctx.btn(pixel8::Button::O)
         {
             return;
         }

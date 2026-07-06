@@ -1,5 +1,5 @@
 use heapless::VecView;
-use rico8::{Body, Context, SfxId, SpriteId};
+use pixel8::{Body, Context, SfxId, SpriteId};
 
 use crate::{
     common::{Direction, Size, Sprite},

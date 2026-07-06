@@ -1,7 +1,7 @@
 use core::any::Any;
 
 use heapless::VecView;
-use rico8::{logf, Body, Context, Graphics, SCREEN_HEIGHT};
+use pixel8::{logf, Body, Context, Graphics, SCREEN_HEIGHT};
 
 use crate::{
     common::{Direction, Size, Sprite},

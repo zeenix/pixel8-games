@@ -1,6 +1,6 @@
 use core::num::NonZeroU16;
 
-use rico8::SpriteId;
+use pixel8::SpriteId;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Position {

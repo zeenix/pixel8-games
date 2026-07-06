@@ -1,7 +1,7 @@
 use core::{f32::consts::PI, num::NonZeroU8};
 
 use libm::{cosf, fmodf, sinf};
-use rico8::Color;
+use pixel8::Color;
 
 use crate::common::Position;
 
@@ -44,7 +44,7 @@ impl Rotor {
         )
     }
 
-    pub fn draw(&self, gfx: &mut rico8::Graphics) {
+    pub fn draw(&self, gfx: &mut pixel8::Graphics) {
         let (Position { x: x0, y: y0 }, Position { x: x1, y: y1 }) = self.edges_pos;
 
         gfx.line(x0, y0, x1, y1, COLOR);

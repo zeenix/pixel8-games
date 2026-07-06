@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-rico8 = { git = "https://github.com/zeenix/rico8", default-features = false }
+pixel8 = { git = "https://github.com/zeenix/pixel8", default-features = false }
 heapless = "0.9"
 libm = "0.2"
 

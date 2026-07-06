@@ -1,5 +1,5 @@
 use heapless::Vec;
-use rico8::{Color, Context, Graphics};
+use pixel8::{Color, Context, Graphics};
 
 use crate::common::Position;
 

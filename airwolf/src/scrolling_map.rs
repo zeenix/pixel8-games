@@ -1,4 +1,4 @@
-use rico8::{BitFlags, Color, Context, Graphics, SCREEN_HEIGHT};
+use pixel8::{BitFlags, Color, Context, Graphics, SCREEN_HEIGHT};
 
 #[derive(Debug)]
 pub struct ScrollingMap {
