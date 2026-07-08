@@ -1,0 +1,90 @@
+# Keep every game formatted, lint-clean, and runnable on each push to main
+# and on pull requests. Generic over the games in the repo: a "game" is any
+# top-level directory with a Cargo.toml and an assets.pixel8.json, so a new
+# game is picked up automatically with no changes here.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Match the pixel8 SDK convention: rustfmt runs on nightly so any
+      # nightly-only options a game adopts are honoured.
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+          components: rustfmt
+      - name: Check formatting of every game
+        run: |
+          fail=0
+          for d in */; do
+            [ -f "$d/Cargo.toml" ] && [ -f "$d/assets.pixel8.json" ] || continue
+            echo "::group::fmt $d"
+            (cd "$d" && cargo fmt --all -- --check) || fail=1
+            echo "::endgroup::"
+          done
+          exit $fail
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      # Games build for wasm (their .cargo/config.toml sets the target) and
+      # depend on the pixel8 SDK with no audio backend, so no ALSA is needed.
+      - name: Clippy every game
+        run: |
+          fail=0
+          for d in */; do
+            [ -f "$d/Cargo.toml" ] && [ -f "$d/assets.pixel8.json" ] || continue
+            echo "::group::clippy $d"
+            # No --all-targets: carts are panic=abort cdylibs, so the test
+            # harness can't be built for wasm (duplicate panic lang item).
+            (cd "$d" && cargo clippy -- -D warnings) || fail=1
+            echo "::endgroup::"
+          done
+          exit $fail
+
+  verify:
+    # Build each game into a cartridge and run it headless for 60 frames,
+    # catching carts that fail to build or panic at runtime.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The pixel8 console provides the `export`/`verify` tooling. Check it
+      # out alongside; the games track its main branch via a git dependency.
+      - uses: actions/checkout@v4
+        with:
+          repository: zeenix/pixel8
+          path: pixel8-src
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: pixel8-src
+
+      # Headless tooling only: --no-default-features drops the audio backend,
+      # so no ALSA system packages are needed.
+      - name: Build the pixel8 console
+        run: cargo build --release -p pixel8-console --no-default-features
+        working-directory: pixel8-src
+
+      - name: Verify every game
+        run: PIXEL8="$PWD/pixel8-src/target/release/pixel8" ./.github/verify-games.sh

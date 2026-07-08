@@ -1,0 +1,72 @@
+# Publish every game to GitHub Pages on each push to main: a shelf of
+# cartridge PNGs, each linking to its playable single-file web export —
+# the same treatment the pixel8 console gives its example carts.
+#
+# Generic over the games in the repo (any top-level dir with a Cargo.toml
+# and an assets.pixel8.json), so a new game is published with no changes here.
+#
+# Requires Pages to be enabled with "GitHub Actions" as the source
+# (repo Settings -> Pages -> Build and deployment).
+
+name: deploy games
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One Pages deployment at a time; newer pushes win.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The pixel8 console builds the carts and the web player; the games
+      # track its main branch via a git dependency, so check out main.
+      - uses: actions/checkout@v4
+        with:
+          repository: zeenix/pixel8
+          path: pixel8-src
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: pixel8-src
+
+      # Headless export tooling only: --no-default-features skips the audio
+      # backend, so no ALSA system packages are needed.
+      - name: Build the pixel8 console
+        run: cargo build --release -p pixel8-console --no-default-features
+        working-directory: pixel8-src
+
+      - name: Export, verify and web-export every game
+        run: |
+          PIXEL8="$PWD/pixel8-src/target/release/pixel8" \
+          PIXEL8_WEB="$PWD/pixel8-src/pixel8-web" \
+            ./.github/build-games-site.sh site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
