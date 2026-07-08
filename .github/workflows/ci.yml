@@ -81,10 +81,12 @@ jobs:
           workspaces: pixel8-src
 
       # Headless tooling only: --no-default-features drops the audio backend,
-      # so no ALSA system packages are needed.
+      # so no ALSA system packages are needed. A debug build is fine and much
+      # faster to compile — the console only orchestrates the carts' own
+      # --release wasm builds, so its opt level doesn't affect the output.
       - name: Build the pixel8 console
-        run: cargo build --release -p pixel8-console --no-default-features
+        run: cargo build -p pixel8-console --no-default-features
         working-directory: pixel8-src
 
       - name: Verify every game
-        run: PIXEL8="$PWD/pixel8-src/target/release/pixel8" ./.github/verify-games.sh
+        run: PIXEL8="$PWD/pixel8-src/target/debug/pixel8" ./.github/verify-games.sh

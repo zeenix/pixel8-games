@@ -46,14 +46,17 @@ jobs:
           workspaces: pixel8-src
 
       # Headless export tooling only: --no-default-features skips the audio
-      # backend, so no ALSA system packages are needed.
+      # backend, so no ALSA system packages are needed. A debug build is fine
+      # and much faster to compile — the console only orchestrates the carts'
+      # --release wasm builds and the web player's web-release build, so its
+      # own opt level doesn't affect the published artifacts.
       - name: Build the pixel8 console
-        run: cargo build --release -p pixel8-console --no-default-features
+        run: cargo build -p pixel8-console --no-default-features
         working-directory: pixel8-src
 
       - name: Export, verify and web-export every game
         run: |
-          PIXEL8="$PWD/pixel8-src/target/release/pixel8" \
+          PIXEL8="$PWD/pixel8-src/target/debug/pixel8" \
           PIXEL8_WEB="$PWD/pixel8-src/pixel8-web" \
             ./.github/build-games-site.sh site
 
