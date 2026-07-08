@@ -154,9 +154,9 @@ impl Entity for TheLady {
 const SPRITE_ID: SpriteId = SpriteId(1);
 const SIZE: Size = unsafe { Size::new_unchecked(8, 8) };
 const MAIN_ROTOR_OFFSET: Position = Position { x: 4, y: 3 };
-const MAIN_ROTOR_LENGTH: NonZeroU8 = unsafe { NonZeroU8::new_unchecked(3) };
+const MAIN_ROTOR_LENGTH: NonZeroU8 = NonZeroU8::new(3).unwrap();
 const TAIL_ROTOR_OFFSET: Position = Position { x: 4, y: 7 };
-const TAIL_ROTOR_LENGTH: NonZeroU8 = unsafe { NonZeroU8::new_unchecked(2) };
+const TAIL_ROTOR_LENGTH: NonZeroU8 = NonZeroU8::new(2).unwrap();
 const STARTING_POSITION: Position = Position { x: 63, y: 111 };
 const SPEED: f32 = 0.7;
 const DESTROY_SFX: SfxId = SfxId::new(1).unwrap();

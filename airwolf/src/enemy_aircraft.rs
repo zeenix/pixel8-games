@@ -129,9 +129,9 @@ impl Entity for EnemyAircraft {
 const SPRITE_ID: SpriteId = SpriteId(32);
 const SIZE: Size = unsafe { Size::new_unchecked(6, 8) };
 const MAIN_ROTOR_OFFSET: Position = Position { x: 2, y: 4 };
-const MAIN_ROTOR_LENGTH: NonZeroU8 = unsafe { NonZeroU8::new_unchecked(3) };
+const MAIN_ROTOR_LENGTH: NonZeroU8 = NonZeroU8::new(3).unwrap();
 const TAIL_ROTOR_OFFSET: Position = Position { x: 2, y: 0 };
-const TAIL_ROTOR_LENGTH: NonZeroU8 = unsafe { NonZeroU8::new_unchecked(2) };
+const TAIL_ROTOR_LENGTH: NonZeroU8 = NonZeroU8::new(2).unwrap();
 const STARTING_Y: f32 = -8.0;
 const SPEED: f32 = 0.3;
 const DESTROY_SFX: SfxId = SfxId::new(2).unwrap();

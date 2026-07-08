@@ -67,10 +67,8 @@ impl Cart {
             .music(MUSIC_ID)
             .reserve_channels(Channel::Channel0 | Channel::Channel1 | Channel::Channel2)
             .play()
-            .map_err(|e| {
+            .inspect_err(|&e| {
                 logf!(64; ctx, "Music failed: {e}");
-
-                e
             })
             .ok();
         self.scene = Scene::Game {
@@ -138,7 +136,9 @@ impl Cart {
         self.scene = Scene::GameOver {
             ts: Some(ctx.time()),
         };
-        self.playing_music.take().map(|p| p.stop());
+        if let Some(p) = self.playing_music.take() {
+            p.stop()
+        }
         self.smap.stop_scrolling();
         if self.score > self.high_score {
             self.high_score = self.score;
@@ -154,21 +154,14 @@ impl Cart {
 
     fn show_score(&self, gfx: &mut Graphics) {
         if matches!(self.scene, Scene::Game { .. } | Scene::GameOver { .. }) {
-            printf!(
-                gfx,
-                SCORE_POS.x as i16,
-                SCORE_POS.y as i16,
-                SCORE_COLOR,
-                "{}",
-                self.score
-            );
+            printf!(gfx, SCORE_POS.x, SCORE_POS.y, SCORE_COLOR, "{}", self.score);
         }
 
         if self.high_score > 0 {
             printf!(
                 gfx,
-                HIGH_SCORE_POS.x as i16,
-                HIGH_SCORE_POS.y as i16,
+                HIGH_SCORE_POS.x,
+                HIGH_SCORE_POS.y,
                 SCORE_COLOR,
                 "{:5}",
                 self.high_score
@@ -200,9 +193,9 @@ impl Game for Cart {
                 self.running_update(ctx);
 
                 if self.playing_music.is_some() && ctx.time() - start_time > MUSIC_DURATION {
-                    self.playing_music
-                        .take()
-                        .map(|p| p.fade_out(MUSIC_FAID_OUT_DURATION).stop());
+                    if let Some(p) = self.playing_music.take() {
+                        p.fade_out(MUSIC_FAID_OUT_DURATION).stop()
+                    }
                 }
 
                 if !self.the_lady.alive() {
@@ -234,7 +227,7 @@ impl Game for Cart {
         };
         if let Some(msg) = msg {
             let Position { x, y } = GAME_OVER_MSG_POS;
-            printf!(gfx, x as i16, y as i16, GAME_OVER_MSG_COLOR, "{}", msg);
+            printf!(gfx, x, y, GAME_OVER_MSG_COLOR, "{}", msg);
         }
 
         self.show_score(gfx);
