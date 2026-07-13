@@ -45,7 +45,7 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 [[package]]
 name = "pixel8"
 version = "0.1.0"
-source = "git+https://github.com/zeenix/pixel8#f34c9aed240ab3afe325831413d37d91c196f6c1"
+source = "git+https://github.com/zeenix/pixel8#0109986b1b9133ffcf500b12617fd02daa2e0e6d"
 
 [[package]]
 name = "stable_deref_trait"
