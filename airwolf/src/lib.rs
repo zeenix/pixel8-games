@@ -32,7 +32,7 @@ struct Cart {
     smap: ScrollingMap,
     scene: Scene,
     score: u32,
-    high_score: u32,
+    high_score: Option<u32>,
     playing_music: Option<PlayingMusic>,
 }
 
@@ -47,7 +47,7 @@ impl Cart {
             smap: ScrollingMap::new(),
             scene: Scene::Start,
             score: 0,
-            high_score: 0,
+            high_score: None,
             playing_music: None,
         }
     }
@@ -140,8 +140,11 @@ impl Cart {
             p.stop()
         }
         self.smap.stop_scrolling();
-        if self.score > self.high_score {
-            self.high_score = self.score;
+
+        // Can't be `None` because we ensure it's initialized at the very start of `update`.
+        if self.score > self.high_score.unwrap() {
+            self.high_score.replace(self.score);
+            ctx.storage_set("high-score", self.score).unwrap();
         }
     }
 
@@ -157,14 +160,15 @@ impl Cart {
             printf!(gfx, SCORE_POS.x, SCORE_POS.y, SCORE_COLOR, "{}", self.score);
         }
 
-        if self.high_score > 0 {
+        let high = self.high_score.unwrap_or(0);
+        if high > 0 {
             printf!(
                 gfx,
                 HIGH_SCORE_POS.x,
                 HIGH_SCORE_POS.y,
                 SCORE_COLOR,
                 "{:5}",
-                self.high_score
+                high,
             );
         }
     }
@@ -172,6 +176,13 @@ impl Cart {
 
 impl Game for Cart {
     fn update(&mut self, ctx: &mut Context) {
+        // Initialize the high score, if needed.
+        self.high_score.get_or_insert_with(|| {
+            ctx.storage_get("high-score")
+                .as_ref()
+                .and_then(StorageValue::as_i64)
+                .unwrap_or(0) as u32
+        });
         self.smap.update(ctx);
         self.the_lady.update(ctx, &self.state());
 
