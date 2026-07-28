@@ -10,7 +10,7 @@ mod shooter;
 mod the_lady;
 
 use heapless::Vec;
-use pixel8::{plume::Explosion, *};
+use pixel8::{physics::Kinetic, plume::Explosion, *};
 
 use crate::{
     bullet::Bullet, common::Position, enemy_aircraft::EnemyAircraft, entity::Entity,

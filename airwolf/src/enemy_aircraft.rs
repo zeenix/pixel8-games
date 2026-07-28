@@ -1,10 +1,14 @@
 use core::num::NonZeroU8;
 
 use heapless::VecView;
-use pixel8::{plume::Explosion, Body, Context, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH};
+use pixel8::{
+    physics::{Bounds, Kinetic, Velocity},
+    plume::Explosion,
+    Body, Context, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH,
+};
 
 use crate::{
-    common::{Direction, Position, Size, Sprite},
+    common::Position,
     entity::{self, Entity},
     rotor::Rotor,
     shooter::{BulletProps, Shooter},
@@ -14,6 +18,7 @@ use crate::{
 #[derive(Debug)]
 pub struct EnemyAircraft {
     body: Body,
+    velocity: Velocity,
     main_rotor: Rotor,
     tail_rotor: Rotor,
     last_bullet: f32,
@@ -25,6 +30,7 @@ impl EnemyAircraft {
         let x = ctx.random(0.0..SCREEN_WIDTH as f32);
         Self {
             body: Body::new(x, STARTING_Y),
+            velocity: Velocity::default(),
             main_rotor: Rotor::new(MAIN_ROTOR_OFFSET, MAIN_ROTOR_LENGTH),
             tail_rotor: Rotor::new(TAIL_ROTOR_OFFSET, TAIL_ROTOR_LENGTH),
             last_bullet: 0.0,
@@ -32,19 +38,19 @@ impl EnemyAircraft {
         }
     }
 
-    fn move_it(&mut self, _ctx: &mut Context, state: &CartState) {
+    fn chase(&mut self, state: &CartState) {
         let (x, _) = self.body.draw_pos();
 
         // Enemy aircraft just moves slowly down the screen but horizontally towards the player.
-        let dir = if x < state.protoganist_pos.x {
-            Direction::DownRight
+        let dx = if x < state.protoganist_pos.x {
+            SPEED
         } else if x > state.protoganist_pos.x {
-            Direction::DownLeft
+            -SPEED
         } else {
-            Direction::Down
+            0.0
         };
 
-        self.go(dir, SPEED);
+        self.velocity = Velocity::new(dx, SPEED);
     }
 }
 
@@ -67,20 +73,27 @@ impl Shooter for EnemyAircraft {
     }
 }
 
-impl Entity for EnemyAircraft {
-    fn body(&self) -> Body {
-        self.body
+impl Kinetic for EnemyAircraft {
+    fn body(&self) -> &Body {
+        &self.body
     }
 
     fn body_mut(&mut self) -> &mut Body {
         &mut self.body
     }
 
-    fn sprite(&self) -> Sprite {
-        Sprite {
-            id: SPRITE_ID,
-            size: SIZE,
-        }
+    fn velocity_mut(&mut self) -> &mut Velocity {
+        &mut self.velocity
+    }
+
+    fn bounds(&self) -> Bounds {
+        Bounds::of(&self.body, WIDTH, HEIGHT)
+    }
+}
+
+impl Entity for EnemyAircraft {
+    fn sprite(&self) -> SpriteId {
+        SPRITE_ID
     }
 
     fn entity_type(&self) -> entity::Type {
@@ -96,10 +109,14 @@ impl Entity for EnemyAircraft {
 
     fn update(&mut self, ctx: &mut Context, state: &CartState) {
         if matches!(state.scene, Scene::Game { .. }) {
-            self.move_it(ctx, state);
+            self.chase(state);
+        } else {
+            // Whatever is in the air when the game ends hangs there.
+            self.velocity = Velocity::default();
         }
+        self.step(ctx, &[]);
 
-        let pos = self.body().draw_pos().into();
+        let pos = self.body.draw_pos().into();
         self.main_rotor.update(pos);
         self.tail_rotor.update(pos);
     }
@@ -113,10 +130,11 @@ impl Entity for EnemyAircraft {
 
     // Override the "outside" definition since the aircraft is spawned above the screen.
     fn outside(&self) -> bool {
-        let (x, y) = self.body().draw_pos();
-        let size = self.sprite().size;
+        let bounds = self.bounds();
 
-        x >= SCREEN_HEIGHT as i16 || (x + size.width.get() as i16) < 0 || y >= SCREEN_HEIGHT as i16
+        bounds.x() >= SCREEN_WIDTH as i16
+            || bounds.right() <= 0
+            || bounds.y() >= SCREEN_HEIGHT as i16
     }
 
     fn hit(&mut self, ctx: &mut Context, explosions: &mut VecView<Explosion>) {
@@ -126,7 +144,8 @@ impl Entity for EnemyAircraft {
 }
 
 const SPRITE_ID: SpriteId = SpriteId(32);
-const SIZE: Size = unsafe { Size::new_unchecked(6, 8) };
+const WIDTH: u16 = 6;
+const HEIGHT: u16 = 8;
 const MAIN_ROTOR_OFFSET: Position = Position { x: 2, y: 4 };
 const MAIN_ROTOR_LENGTH: NonZeroU8 = NonZeroU8::new(3).unwrap();
 const TAIL_ROTOR_OFFSET: Position = Position { x: 2, y: 0 };

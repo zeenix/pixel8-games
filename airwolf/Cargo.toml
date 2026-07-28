@@ -7,8 +7,11 @@ description = "helicopter shoot-'em-up"
 [lib]
 crate-type = ["cdylib"]
 
+# The explosions are `plume-effects` and everything that moves is `physics`, both off by default
+# like every other family the SDK ships.
 [dependencies]
 pixel8 = { git = "https://github.com/zeenix/pixel8", default-features = false, features = [
+    "physics",
     "plume-effects",
 ] }
 heapless = "0.9"

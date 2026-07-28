@@ -1,29 +1,17 @@
-use core::any::Any;
-
 use heapless::VecView;
-use pixel8::{logf, plume::Explosion, Body, Context, Graphics, SCREEN_HEIGHT};
+use pixel8::{logf, physics::Kinetic, plume::Explosion, Context, Graphics, SpriteId};
 
-use crate::{
-    common::{Direction, Size, Sprite},
-    CartState,
-};
+use crate::CartState;
 
-pub trait Entity: 'static {
-    fn body(&self) -> Body;
-    fn body_mut(&mut self) -> &mut Body;
-    fn sprite(&self) -> Sprite;
+/// What the game makes of an entity, on top of the movement `Kinetic` lends it.
+///
+/// Where a thing is, what it covers and whether two of them have run into each other are the
+/// SDK's; this is what airwolf itself has to say about one: which sprite it wears, which side it
+/// is on, and what a hit costs it.
+pub trait Entity: Kinetic + 'static {
+    /// The sprite to draw. How big it is, is the rectangle it hands the SDK.
+    fn sprite(&self) -> SpriteId;
     fn entity_type(&self) -> Type;
-
-    /// Returns `true` if the entity is outside the screen.
-    fn outside(&self) -> bool {
-        let (x, y) = self.body().draw_pos();
-        let size = self.sprite().size;
-
-        x >= SCREEN_HEIGHT as i16
-            || (x + size.width.get() as i16) < 0
-            || y >= SCREEN_HEIGHT as i16
-            || (y + size.height.get() as i16) < 0
-    }
 
     /// Wether this entity is still alive.
     fn alive(&self) -> bool;
@@ -36,36 +24,23 @@ pub trait Entity: 'static {
     }
 
     fn draw_default(&self, gfx: &mut Graphics, _state: &CartState) {
-        let (x, y) = self.body().draw_pos();
-        let size = self.sprite().size;
+        let bounds = self.bounds();
+
         gfx.sprite_ext(
-            self.sprite().id,
-            x,
-            y,
-            size.width.get(),
-            size.height.get(),
+            self.sprite(),
+            bounds.x(),
+            bounds.y(),
+            bounds.width(),
+            bounds.height(),
             false,
             false,
         )
         .unwrap();
     }
 
-    fn go(&mut self, dir: Direction, distance: f32) {
-        self.go_default(dir, distance);
-    }
-
-    fn go_default(&mut self, dir: Direction, distance: f32) {
-        let body = self.body_mut();
-        match dir {
-            Direction::Left => body.move_by(-distance, 0.0),
-            Direction::Right => body.move_by(distance, 0.0),
-            Direction::Up => body.move_by(0.0, -distance),
-            Direction::Down => body.move_by(0.0, distance),
-            Direction::UpLeft => body.move_by(-distance, -distance),
-            Direction::DownLeft => body.move_by(-distance, distance),
-            Direction::UpRight => body.move_by(distance, -distance),
-            Direction::DownRight => body.move_by(distance, distance),
-        }
+    /// Returns `true` if the entity is outside the screen.
+    fn outside(&self) -> bool {
+        !self.bounds().on_screen()
     }
 
     /// Check for collision and act on it.
@@ -75,35 +50,12 @@ pub trait Entity: 'static {
         ctx: &mut Context,
         explosions: &mut VecView<Explosion>,
     ) {
-        if !self.alive() || !other.alive() || !self.collided(other) {
+        if !self.alive() || !other.alive() || !self.overlaps(other.bounds()) {
             return;
         }
 
         self.hit(ctx, explosions);
         other.hit(ctx, explosions);
-    }
-
-    fn collided(&self, other: &dyn Entity) -> bool {
-        // Skip self and collision with explosion.
-        if self.type_id() == other.type_id() && self.entity_type() == Type::Explosion {
-            return false;
-        }
-
-        let (our_x, our_y) = self.body().draw_pos();
-        let (other_x, other_y) = other.body().draw_pos();
-        let Size {
-            width: our_width,
-            height: our_height,
-        } = self.sprite().size;
-        let Size {
-            width: other_width,
-            height: other_height,
-        } = other.sprite().size;
-
-        our_x < other_x + other_width.get() as i16
-            && our_x + our_width.get() as i16 > other_x
-            && our_y < other_y + other_height.get() as i16
-            && our_y + our_height.get() as i16 > other_y
     }
 
     fn hit(&mut self, ctx: &mut Context, explosions: &mut VecView<Explosion>);
@@ -127,5 +79,4 @@ pub enum Type {
     Enemy,
     FriendlyBullet,
     EnemyBullet,
-    Explosion,
 }

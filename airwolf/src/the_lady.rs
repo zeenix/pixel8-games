@@ -2,11 +2,13 @@ use core::num::NonZeroU8;
 
 use heapless::VecView;
 use pixel8::{
-    plume::Explosion, Body, Button, Color, Context, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH,
+    physics::{Bounds, Kinetic, Velocity},
+    plume::Explosion,
+    Body, Button, Color, Context, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH,
 };
 
 use crate::{
-    common::{Direction, Position, Size, Sprite},
+    common::Position,
     entity::{self, Entity},
     rotor::Rotor,
     shooter::{BulletProps, Shooter},
@@ -16,6 +18,7 @@ use crate::{
 #[derive(Debug)]
 pub struct TheLady {
     body: Body,
+    velocity: Velocity,
     main_rotor: Rotor,
     tail_rotor: Rotor,
     last_bullet: f32,
@@ -26,6 +29,7 @@ impl TheLady {
     pub fn new() -> Self {
         Self {
             body: Body::new(STARTING_POSITION.x as f32, STARTING_POSITION.y as f32),
+            velocity: Velocity::default(),
             main_rotor: Rotor::new(MAIN_ROTOR_OFFSET, MAIN_ROTOR_LENGTH),
             tail_rotor: Rotor::new(TAIL_ROTOR_OFFSET, TAIL_ROTOR_LENGTH),
             last_bullet: 0.0,
@@ -34,42 +38,26 @@ impl TheLady {
     }
 
     fn move_it(&mut self, ctx: &mut Context) {
-        let (x, y) = self.body.draw_pos();
-        let Size { width, height } = self.sprite().size;
-
-        let can_left = x > -1;
-        let can_right = x + (width.get() as i16) < SCREEN_WIDTH as i16 - 2;
-        let can_up = y > 0;
-        let can_down = y + (height.get() as i16) < SCREEN_HEIGHT as i16;
-        let can_up_left = can_left && can_up;
-        let can_down_left = can_left && can_down;
-        let can_up_right = can_right && can_up;
-        let can_down_right = can_right && can_down;
-
+        let bounds = self.bounds();
         let buttons = ctx.buttons_down();
-        let dir = if buttons.contains(Button::UP_LEFT) && can_up_left {
-            Some(Direction::UpLeft)
-        } else if buttons.contains(Button::UP_RIGHT) && can_up_right {
-            Some(Direction::UpRight)
-        } else if buttons.contains(Button::DOWN_LEFT) && can_down_left {
-            Some(Direction::DownLeft)
-        } else if buttons.contains(Button::DOWN_RIGHT) && can_down_right {
-            Some(Direction::DownRight)
-        } else if buttons.contains(Button::Up) && can_up {
-            Some(Direction::Up)
-        } else if buttons.contains(Button::Down) && can_down {
-            Some(Direction::Down)
-        } else if buttons.contains(Button::Left) && can_left {
-            Some(Direction::Left)
-        } else if buttons.contains(Button::Right) && can_right {
-            Some(Direction::Right)
-        } else {
-            None
-        };
 
-        if let Some(dir) = dir {
-            self.go(dir, SPEED);
+        // An axis at a time, and each of them only while there is screen left on that side, so a
+        // diagonal held into an edge carries on along it.
+        let mut velocity = Velocity::default();
+        if buttons.contains(Button::Left) && bounds.x() > -1 {
+            velocity.dx -= SPEED;
         }
+        if buttons.contains(Button::Right) && bounds.right() < SCREEN_WIDTH as i16 - 2 {
+            velocity.dx += SPEED;
+        }
+        if buttons.contains(Button::Up) && bounds.y() > 0 {
+            velocity.dy -= SPEED;
+        }
+        if buttons.contains(Button::Down) && bounds.bottom() < SCREEN_HEIGHT as i16 {
+            velocity.dy += SPEED;
+        }
+
+        self.velocity = velocity;
     }
 }
 
@@ -92,20 +80,27 @@ impl Shooter for TheLady {
     }
 }
 
-impl Entity for TheLady {
-    fn body(&self) -> Body {
-        self.body
+impl Kinetic for TheLady {
+    fn body(&self) -> &Body {
+        &self.body
     }
 
     fn body_mut(&mut self) -> &mut Body {
         &mut self.body
     }
 
-    fn sprite(&self) -> Sprite {
-        Sprite {
-            id: SPRITE_ID,
-            size: SIZE,
-        }
+    fn velocity_mut(&mut self) -> &mut Velocity {
+        &mut self.velocity
+    }
+
+    fn bounds(&self) -> Bounds {
+        Bounds::of(&self.body, WIDTH, HEIGHT)
+    }
+}
+
+impl Entity for TheLady {
+    fn sprite(&self) -> SpriteId {
+        SPRITE_ID
     }
 
     fn entity_type(&self) -> entity::Type {
@@ -125,9 +120,13 @@ impl Entity for TheLady {
         }
         if matches!(state.scene, Scene::Game { .. }) {
             self.move_it(ctx);
+        } else {
+            // Nothing to fly her with between games; she holds her hover.
+            self.velocity = Velocity::default();
         }
+        self.step(ctx, &[]);
 
-        let pos = self.body().draw_pos().into();
+        let pos = self.body.draw_pos().into();
         self.main_rotor.update(pos);
         self.tail_rotor.update(pos);
     }
@@ -153,7 +152,8 @@ impl Entity for TheLady {
 }
 
 const SPRITE_ID: SpriteId = SpriteId(1);
-const SIZE: Size = unsafe { Size::new_unchecked(8, 8) };
+const WIDTH: u16 = 8;
+const HEIGHT: u16 = 8;
 const MAIN_ROTOR_OFFSET: Position = Position { x: 4, y: 3 };
 const MAIN_ROTOR_LENGTH: NonZeroU8 = NonZeroU8::new(3).unwrap();
 const TAIL_ROTOR_OFFSET: Position = Position { x: 4, y: 7 };
