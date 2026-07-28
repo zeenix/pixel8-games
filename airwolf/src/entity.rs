@@ -1,11 +1,10 @@
 use core::any::Any;
 
 use heapless::VecView;
-use pixel8::{logf, Body, Context, Graphics, SCREEN_HEIGHT};
+use pixel8::{logf, plume::Explosion, Body, Context, Graphics, SCREEN_HEIGHT};
 
 use crate::{
     common::{Direction, Size, Sprite},
-    explosion::Explosion,
     CartState,
 };
 
@@ -111,11 +110,10 @@ pub trait Entity: 'static {
 
     fn destroy(&mut self, ctx: &mut Context, explosions: &mut VecView<Explosion>) {
         *self.alive_mut() = false;
-        explosions
-            .push(Explosion::new(self.body().draw_pos().into(), ctx))
-            .unwrap_or_else(|_| {
-                logf!(ctx, "Err: Too many explosions: {}", super::MAX_EXPLOSIONS);
-            });
+        let (x, y) = self.body().draw_pos();
+        explosions.push(Explosion::new(x, y)).unwrap_or_else(|_| {
+            logf!(ctx, "Err: Too many explosions: {}", super::MAX_EXPLOSIONS);
+        });
     }
 
     fn is_enemy(&self) -> bool {

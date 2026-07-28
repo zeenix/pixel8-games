@@ -4,18 +4,17 @@ mod bullet;
 mod common;
 mod enemy_aircraft;
 mod entity;
-mod explosion;
 mod rotor;
 mod scrolling_map;
 mod shooter;
 mod the_lady;
 
 use heapless::Vec;
-use pixel8::*;
+use pixel8::{plume::Explosion, *};
 
 use crate::{
     bullet::Bullet, common::Position, enemy_aircraft::EnemyAircraft, entity::Entity,
-    explosion::Explosion, scrolling_map::ScrollingMap, shooter::Shooter, the_lady::TheLady,
+    scrolling_map::ScrollingMap, shooter::Shooter, the_lady::TheLady,
 };
 
 pixel8::game!(Cart = Cart::new());
@@ -113,7 +112,7 @@ impl Cart {
         });
         self.explosions.retain_mut(|explosion| {
             explosion.update(ctx);
-            !explosion.disappeared()
+            !explosion.finished()
         });
 
         self.the_lady.shoot(ctx, &mut self.bullets);

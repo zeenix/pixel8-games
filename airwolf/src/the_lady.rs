@@ -1,12 +1,13 @@
 use core::num::NonZeroU8;
 
 use heapless::VecView;
-use pixel8::{Body, Button, Color, Context, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH};
+use pixel8::{
+    plume::Explosion, Body, Button, Color, Context, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH,
+};
 
 use crate::{
     common::{Direction, Position, Size, Sprite},
     entity::{self, Entity},
-    explosion::Explosion,
     rotor::Rotor,
     shooter::{BulletProps, Shooter},
     CartState, Scene,

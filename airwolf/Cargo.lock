@@ -45,7 +45,10 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 [[package]]
 name = "pixel8"
 version = "0.1.0"
-source = "git+https://github.com/zeenix/pixel8#0109986b1b9133ffcf500b12617fd02daa2e0e6d"
+source = "git+https://github.com/zeenix/pixel8#5ceb6d97236b2ec684ad714ab95ccb4ab3bb9818"
+dependencies = [
+ "heapless",
+]
 
 [[package]]
 name = "stable_deref_trait"

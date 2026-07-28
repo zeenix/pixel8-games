@@ -1,10 +1,9 @@
 use heapless::VecView;
-use pixel8::{Body, Context, SfxId, SpriteId};
+use pixel8::{plume::Explosion, Body, Context, SfxId, SpriteId};
 
 use crate::{
     common::{Direction, Size, Sprite},
     entity::{self, Entity},
-    explosion::Explosion,
     CartState,
 };
 

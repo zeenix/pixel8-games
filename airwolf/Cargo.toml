@@ -8,7 +8,9 @@ description = "helicopter shoot-'em-up"
 crate-type = ["cdylib"]
 
 [dependencies]
-pixel8 = { git = "https://github.com/zeenix/pixel8", default-features = false }
+pixel8 = { git = "https://github.com/zeenix/pixel8", default-features = false, features = [
+    "plume-effects",
+] }
 heapless = "0.9"
 libm = "0.2"
 
