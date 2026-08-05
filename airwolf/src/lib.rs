@@ -11,7 +11,7 @@ mod the_lady;
 
 use heapless::Vec;
 use pixel8::{
-    physics::{Kinetic, World},
+    physics::{Cast, Kinetic, World},
     plume::Explosion,
     *,
 };
@@ -135,7 +135,7 @@ impl Cart {
         }
         // A bullet holds the course it was fired on, so there is nothing to steer it with.
 
-        let mut cast: Vec<&mut dyn Kinetic, MAX_CAST> = Vec::new();
+        let mut cast: Cast<MAX_CAST> = Cast::new();
         // The world tells both parties of a meeting, whichever one's movement made it, so a hit
         // is mutual however the cast is ordered and neither party has to be kept alive for the
         // other to notice. What the order still decides is *where* everybody is met, and it runs
@@ -308,10 +308,13 @@ pub(crate) enum Scene {
     },
 }
 
-const MAX_BULLETS: usize = 64;
+// Sized so the whole sky fits the wire: the lady, every aircraft and every shot in flight sum
+// to exactly the sixty-four cast members one step carries. Forty-seven shots at once is far past
+// what the fire rates can put in the air; a shot past the cap is refused where it is fired.
+const MAX_BULLETS: usize = 47;
 const MAX_ENEMY_AIRCRAFTS: usize = 16;
 // The lady, every aircraft in the air and every shot either side has in flight: everything the
-// world is handed each update.
+// world is handed each update, and the capacity of the cast that hands it over.
 const MAX_CAST: usize = 1 + MAX_ENEMY_AIRCRAFTS + MAX_BULLETS;
 const MAX_EXPLOSIONS: usize = MAX_ENEMY_AIRCRAFTS + 8;
 // 3 seconds.
