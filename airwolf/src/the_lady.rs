@@ -2,13 +2,14 @@ use core::num::NonZeroU8;
 
 use heapless::VecView;
 use pixel8::{
-    physics::{Bounds, Kinetic, Velocity},
+    physics::{Bounds, Contacts, Kinetic, Velocity},
     plume::Explosion,
-    Body, Button, Color, Context, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH,
+    BitFlags, Body, Button, Color, Context, SfxId, SpriteFlag, SpriteId, SCREEN_HEIGHT,
+    SCREEN_WIDTH,
 };
 
 use crate::{
-    common::Position,
+    common::{Position, AIRCRAFT, ENEMY_SHOT},
     entity::{self, Entity},
     rotor::Rotor,
     shooter::{BulletProps, Shooter},
@@ -19,6 +20,9 @@ use crate::{
 pub struct TheLady {
     body: Body,
     velocity: Velocity,
+    /// What the world's last step ran into: an aircraft, or a shot of theirs. The world writes it
+    /// and she reads it, in the same update.
+    contacts: Contacts,
     main_rotor: Rotor,
     tail_rotor: Rotor,
     last_bullet: f32,
@@ -30,6 +34,7 @@ impl TheLady {
         Self {
             body: Body::new(STARTING_POSITION.x as f32, STARTING_POSITION.y as f32),
             velocity: Velocity::default(),
+            contacts: Contacts::default(),
             main_rotor: Rotor::new(MAIN_ROTOR_OFFSET, MAIN_ROTOR_LENGTH),
             tail_rotor: Rotor::new(TAIL_ROTOR_OFFSET, TAIL_ROTOR_LENGTH),
             last_bullet: 0.0,
@@ -93,16 +98,32 @@ impl Kinetic for TheLady {
         &mut self.velocity
     }
 
+    fn contacts(&self) -> &Contacts {
+        &self.contacts
+    }
+
+    fn contacts_mut(&mut self) -> &mut Contacts {
+        &mut self.contacts
+    }
+
     fn bounds(&self) -> Bounds {
         Bounds::of(&self.body, WIDTH, HEIGHT)
+    }
+
+    /// The cell she is drawn from, whose `LADY` flag is what an aircraft hunting her — and every
+    /// shot aimed at her — is told it met.
+    fn sprite(&self) -> Option<SpriteId> {
+        Some(SPRITE_ID)
+    }
+
+    /// A ram or a shot, which is the whole of what can end her — the same pair `react` asks
+    /// about. Our own shots stream past her every update and are none of her business.
+    fn heeds(&self) -> BitFlags<SpriteFlag> {
+        AIRCRAFT | ENEMY_SHOT
     }
 }
 
 impl Entity for TheLady {
-    fn sprite(&self) -> SpriteId {
-        SPRITE_ID
-    }
-
     fn entity_type(&self) -> entity::Type {
         entity::Type::Protoganist
     }
@@ -114,7 +135,7 @@ impl Entity for TheLady {
         &mut self.alive
     }
 
-    fn update(&mut self, ctx: &mut Context, state: &CartState) {
+    fn steer(&mut self, ctx: &mut Context, state: &CartState) {
         if !self.alive {
             return;
         }
@@ -124,7 +145,17 @@ impl Entity for TheLady {
             // Nothing to fly her with between games; she holds her hover.
             self.velocity = Velocity::default();
         }
-        self.step(ctx, &[]);
+    }
+
+    fn react(&mut self, ctx: &mut Context, explosions: &mut VecView<Explosion>) {
+        if !self.alive {
+            return;
+        }
+        // A ram or a shot; either is the end of her, and she asks after nothing else.
+        if self.contacts.touches(AIRCRAFT | ENEMY_SHOT) {
+            self.destroy(ctx, explosions);
+            ctx.sfx(DESTROY_SFX);
+        }
 
         let pos = self.body.draw_pos().into();
         self.main_rotor.update(pos);
@@ -143,11 +174,6 @@ impl Entity for TheLady {
 
         self.main_rotor.draw(gfx);
         self.tail_rotor.draw(gfx);
-    }
-
-    fn hit(&mut self, ctx: &mut Context, explosions: &mut VecView<Explosion>) {
-        self.destroy(ctx, explosions);
-        ctx.sfx(DESTROY_SFX);
     }
 }
 

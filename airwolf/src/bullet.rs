@@ -1,19 +1,22 @@
 use heapless::VecView;
 use pixel8::{
-    physics::{Bounds, Kinetic, Velocity},
+    physics::{Bounds, Contacts, Kinetic, Velocity},
     plume::Explosion,
-    Body, Context, SfxId, SpriteId,
+    BitFlags, Body, Context, SfxId, SpriteFlag, SpriteId,
 };
 
 use crate::{
+    common::{AIRCRAFT, LADY},
     entity::{self, Entity},
-    CartState,
 };
 
 #[derive(Debug)]
 pub struct Bullet {
     body: Body,
     velocity: Velocity,
+    /// What the world's last step ran into, of which a shot asks after one thing only: whether it
+    /// has arrived at what it was fired at.
+    contacts: Contacts,
     entity_type: entity::Type,
     alive: bool,
 }
@@ -40,6 +43,7 @@ impl Bullet {
         Self {
             body: Body::new(x, y),
             velocity: Velocity::new(0.0, dy),
+            contacts: Contacts::default(),
             entity_type,
             alive: true,
         }
@@ -59,6 +63,14 @@ impl Kinetic for Bullet {
         &mut self.velocity
     }
 
+    fn contacts(&self) -> &Contacts {
+        &self.contacts
+    }
+
+    fn contacts_mut(&mut self) -> &mut Contacts {
+        &mut self.contacts
+    }
+
     fn bounds(&self) -> Bounds {
         let (width, height) = if self.is_enemy() {
             ENEMY_SIZE
@@ -68,17 +80,25 @@ impl Kinetic for Bullet {
 
         Bounds::of(&self.body, width, height)
     }
-}
 
-impl Entity for Bullet {
-    fn sprite(&self) -> SpriteId {
-        if self.is_enemy() {
+    /// The cell it is drawn from, and with it the flag that tells the side it is fired at that a
+    /// shot has arrived.
+    fn sprite(&self) -> Option<SpriteId> {
+        Some(if self.is_enemy() {
             ENEMY_SPRITE_ID
         } else {
             FRIENDLY_SPRITE_ID
-        }
+        })
     }
 
+    /// The one thing a shot is spent on — the same target `react` asks about below, said once here
+    /// so the world never works out anything else this shot flew past.
+    fn heeds(&self) -> BitFlags<SpriteFlag> {
+        if self.is_enemy() { LADY } else { AIRCRAFT }.into()
+    }
+}
+
+impl Entity for Bullet {
     fn entity_type(&self) -> entity::Type {
         self.entity_type
     }
@@ -90,12 +110,13 @@ impl Entity for Bullet {
         &mut self.alive
     }
 
-    fn update(&mut self, ctx: &mut Context, _state: &CartState) {
-        self.step(ctx, &[]);
-    }
-
-    fn hit(&mut self, ctx: &mut Context, explosions: &mut VecView<Explosion>) {
-        self.destroy(ctx, explosions);
+    fn react(&mut self, ctx: &mut Context, explosions: &mut VecView<Explosion>) {
+        // Each side's shot is spent on the other side's target and on nothing else — not on its
+        // own kind, and not on the thing that fired it.
+        let target = if self.is_enemy() { LADY } else { AIRCRAFT };
+        if self.contacts.touches(target) {
+            self.destroy(ctx, explosions);
+        }
     }
 }
 

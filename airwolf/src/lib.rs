@@ -10,7 +10,11 @@ mod shooter;
 mod the_lady;
 
 use heapless::Vec;
-use pixel8::{physics::Kinetic, plume::Explosion, *};
+use pixel8::{
+    physics::{Kinetic, World},
+    plume::Explosion,
+    *,
+};
 
 use crate::{
     bullet::Bullet, common::Position, enemy_aircraft::EnemyAircraft, entity::Entity,
@@ -19,8 +23,9 @@ use crate::{
 
 pixel8::game!(Cart = Cart::new());
 
-#[derive(Debug)]
 struct Cart {
+    /// The one thing that moves anything in this cart.
+    world: World,
     bullets: Vec<Bullet, MAX_BULLETS>,
     explosions: Vec<Explosion, MAX_EXPLOSIONS>,
 
@@ -38,6 +43,7 @@ struct Cart {
 impl Cart {
     fn new() -> Self {
         Self {
+            world: World::mapless(),
             bullets: Vec::new(),
             explosions: Vec::new(),
             the_lady: TheLady::new(),
@@ -78,37 +84,26 @@ impl Cart {
     fn running_update(&mut self, ctx: &mut Context) {
         let time = ctx.time();
 
-        let state = self.state();
-        self.bullets.retain_mut(|bullet| {
-            match bullet.entity_type() {
-                entity::Type::EnemyBullet => {
-                    bullet.handle_collision(&mut self.the_lady, ctx, &mut self.explosions)
-                }
-                entity::Type::FriendlyBullet => {
-                    for aircraft in &mut self.enemy_aircrafts {
-                        bullet.handle_collision(aircraft, ctx, &mut self.explosions);
-                        if !aircraft.alive() {
-                            self.score += DESTORY_SCORE_BUMP as u32;
-                        }
-                    }
-                }
-                _ => unreachable!("unknown bullet type encountered"),
-            }
-
-            retain_fn(bullet, ctx, &state)
-        });
+        // The dead were settled the moment the world stepped them, so this pass only drops them
+        // and counts what they were worth.
+        self.bullets
+            .retain(|bullet| bullet.alive() && !bullet.outside());
         self.enemy_aircrafts.retain_mut(|aircraft| {
-            debug_assert!(matches!(aircraft.entity_type(), entity::Type::Enemy));
-            aircraft.handle_collision(&mut self.the_lady, ctx, &mut self.explosions);
             if matches!(self.scene, Scene::Game { .. }) {
                 aircraft.shoot(ctx, &mut self.bullets);
             }
-            let retain = retain_fn(aircraft, ctx, &state);
-            if aircraft.outside() {
+            let keep = aircraft.alive() && !aircraft.outside();
+            // The aircraft is the only one that knows a shot of ours took it down rather than a
+            // ram, and it is dropped exactly once — so the bump rides the drop.
+            if !keep && aircraft.died_to_shot() {
+                self.score += DESTORY_SCORE_BUMP as u32;
+            }
+            // Only a live escape earns the let-go points.
+            if aircraft.alive() && aircraft.outside() {
                 self.score += LET_GO_SCORE_BUMP as u32;
             }
 
-            retain
+            keep
         });
         self.explosions.retain_mut(|explosion| {
             explosion.update(ctx);
@@ -128,6 +123,51 @@ impl Cart {
                     });
                 self.last_enemy_ts = time;
             }
+        }
+    }
+
+    /// One update of everything that flies: each of them writes down where it means to go, and
+    /// the world takes the whole cast there together.
+    fn fly(&mut self, ctx: &mut Context, state: &CartState) {
+        self.the_lady.steer(ctx, state);
+        for aircraft in &mut self.enemy_aircrafts {
+            aircraft.steer(ctx, state);
+        }
+        // A bullet holds the course it was fired on, so there is nothing to steer it with.
+
+        let mut cast: Vec<&mut dyn Kinetic, MAX_CAST> = Vec::new();
+        // The order is the whole of what makes a hit mutual, and it runs from the fastest thing in
+        // the air to the slowest: the shots, then the aircrafts they are aimed at, and the lady
+        // last of all. Everything is stepped where its target now stands, and the target — stepped
+        // after it — meets it where it has just arrived, so both parties to a meeting read it in
+        // the one update and neither has to be kept alive for the other to notice. A dead lady is
+        // left out altogether: her wreck is nothing for an aircraft to ram. No push can fail — the
+        // cast is the shots, the aircrafts and the lady, and `MAX_CAST` is exactly that many.
+        for bullet in &mut self.bullets {
+            let _ = cast.push(bullet.as_kinetic());
+        }
+        for aircraft in &mut self.enemy_aircrafts {
+            let _ = cast.push(aircraft.as_kinetic());
+        }
+        if self.the_lady.alive() {
+            let _ = cast.push(self.the_lady.as_kinetic());
+        }
+        // Nothing bends any of them — helicopters fly where they are pointed and shots go
+        // straight — so the world is handed no forces at all.
+        self.world.step(ctx, &mut cast);
+    }
+
+    /// What each of them makes of the step it has just taken, read from its own contacts.
+    ///
+    /// Same frame and both ways round: the shot that lands and the target it lands on are told of
+    /// each other here, and either may die of it before anything is drawn.
+    fn react(&mut self, ctx: &mut Context) {
+        self.the_lady.react(ctx, &mut self.explosions);
+        for aircraft in &mut self.enemy_aircrafts {
+            aircraft.react(ctx, &mut self.explosions);
+        }
+        for bullet in &mut self.bullets {
+            bullet.react(ctx, &mut self.explosions);
         }
     }
 
@@ -183,7 +223,12 @@ impl Game for Cart {
                 .unwrap_or(0) as u32
         });
         self.smap.update(ctx);
-        self.the_lady.update(ctx, &self.state());
+
+        // The scene as the cast finds it — which is where the aircrafts read the lady off, so it
+        // is taken before anything has moved.
+        let state = self.state();
+        self.fly(ctx, &state);
+        self.react(ctx);
 
         match self.scene {
             Scene::Start => self.start(ctx),
@@ -244,12 +289,6 @@ impl Game for Cart {
     }
 }
 
-fn retain_fn<E: Entity>(entity: &mut E, ctx: &mut Context, state: &CartState) -> bool {
-    entity.update(ctx, state);
-
-    !entity.outside() && entity.alive()
-}
-
 #[derive(Debug, Clone)]
 pub(crate) struct CartState {
     scene: Scene,
@@ -270,6 +309,9 @@ pub(crate) enum Scene {
 
 const MAX_BULLETS: usize = 64;
 const MAX_ENEMY_AIRCRAFTS: usize = 16;
+// The lady, every aircraft in the air and every shot either side has in flight: everything the
+// world is handed each update.
+const MAX_CAST: usize = 1 + MAX_ENEMY_AIRCRAFTS + MAX_BULLETS;
 const MAX_EXPLOSIONS: usize = MAX_ENEMY_AIRCRAFTS + 8;
 // 3 seconds.
 const GAME_OVER_TIMEOUT: f32 = 3.0;
