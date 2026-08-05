@@ -136,11 +136,12 @@ impl Cart {
         // A bullet holds the course it was fired on, so there is nothing to steer it with.
 
         let mut cast: Vec<&mut dyn Kinetic, MAX_CAST> = Vec::new();
-        // The order is the whole of what makes a hit mutual, and it runs from the fastest thing in
-        // the air to the slowest: the shots, then the aircrafts they are aimed at, and the lady
-        // last of all. Everything is stepped where its target now stands, and the target — stepped
-        // after it — meets it where it has just arrived, so both parties to a meeting read it in
-        // the one update and neither has to be kept alive for the other to notice. A dead lady is
+        // The world tells both parties of a meeting, whichever one's movement made it, so a hit
+        // is mutual however the cast is ordered and neither party has to be kept alive for the
+        // other to notice. What the order still decides is *where* everybody is met, and it runs
+        // from the fastest thing in the air to the slowest: the shots, then the aircrafts they
+        // are aimed at, and the lady last of all — everything is stepped where its target now
+        // stands, so a shot lands the frame it reaches rather than a frame behind. A dead lady is
         // left out altogether: her wreck is nothing for an aircraft to ram. No push can fail — the
         // cast is the shots, the aircrafts and the lady, and `MAX_CAST` is exactly that many.
         for bullet in &mut self.bullets {
