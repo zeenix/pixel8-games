@@ -10,11 +10,7 @@ mod shooter;
 mod the_lady;
 
 use heapless::Vec;
-use pixel8::{
-    physics::{Cast, Kinetic, World},
-    plume::Explosion,
-    *,
-};
+use pixel8::{physics::World, plume::Explosion, *};
 
 use crate::{
     bullet::Bullet, common::Position, enemy_aircraft::EnemyAircraft, entity::Entity,
@@ -23,9 +19,15 @@ use crate::{
 
 pixel8::game!(Cart = Cart::new());
 
+/// The one world everything that flies is seated in: sixty-four seats, exactly enough for the
+/// lady, every aircraft in the air and every shot either side has in flight — see [`MAX_CAST`].
+pub(crate) type Sky = World<MAX_CAST>;
+
 struct Cart {
-    /// The one thing that moves anything in this cart.
-    world: World,
+    /// The one thing that moves anything in this cart, and the one thing that owns where
+    /// everybody is: bullets, aircraft and the lady each keep a `Member` handle into it beside
+    /// their own game data, rather than a position of their own.
+    world: Sky,
     bullets: Vec<Bullet, MAX_BULLETS>,
     explosions: Vec<Explosion, MAX_EXPLOSIONS>,
 
@@ -36,23 +38,29 @@ struct Cart {
     smap: ScrollingMap,
     scene: Scene,
     score: u32,
-    high_score: Option<u32>,
+    high_score: u32,
     playing_music: Option<PlayingMusic>,
 }
 
 impl Cart {
-    fn new() -> Self {
+    /// The state the cart ships in, and every bit of it a constant: an empty, mapless sky, a lady
+    /// with no seat yet, no cast, no score and no high score read yet. The whole of it is written
+    /// into the cart's memory image and placed there by the loader — nothing builds it, and `boot`
+    /// below opens a game in it rather than making one.
+    const fn new() -> Self {
         Self {
-            world: World::mapless(),
+            // The level scrolls past behind the fight and nothing on it is in anybody's way, so
+            // the world never asks the map a question.
+            world: Sky::mapless(),
             bullets: Vec::new(),
             explosions: Vec::new(),
-            the_lady: TheLady::new(),
+            the_lady: TheLady::waiting(),
             enemy_aircrafts: Vec::new(),
             last_enemy_ts: 0.0,
             smap: ScrollingMap::new(),
             scene: Scene::Start,
             score: 0,
-            high_score: None,
+            high_score: 0,
             playing_music: None,
         }
     }
@@ -62,10 +70,22 @@ impl Cart {
             return;
         }
 
-        self.bullets.clear();
+        // Everything the last run seated gives its seat back before this one takes new ones, so a
+        // restart never grows the cast: spent bullets and aircraft still standing get retired
+        // here, and so does the lady's — whether she is still alive (the very first `start`,
+        // nothing having killed her yet) or was already retired when she died.
+        for bullet in self.bullets.drain(..) {
+            self.world.retire(bullet.member());
+        }
+        for aircraft in self.enemy_aircrafts.drain(..) {
+            self.world.retire(aircraft.member());
+        }
+        if self.world.seated(self.the_lady.member()) {
+            self.world.retire(self.the_lady.member());
+        }
+
         self.explosions.clear();
-        self.enemy_aircrafts.clear();
-        self.the_lady = TheLady::new();
+        self.the_lady = TheLady::new(&mut self.world);
         self.smap = ScrollingMap::new();
         self.score = 0;
         self.playing_music = ctx
@@ -83,24 +103,42 @@ impl Cart {
 
     fn running_update(&mut self, ctx: &mut Context) {
         let time = ctx.time();
+        let in_game = matches!(self.scene, Scene::Game { .. });
 
-        // The dead were settled the moment the world stepped them, so this pass only drops them
-        // and counts what they were worth.
-        self.bullets
-            .retain(|bullet| bullet.alive() && !bullet.outside());
+        // The dead were already retired the moment the world stepped them (`react`, through
+        // `Entity::destroy`), so this pass only drops the local record for those; whoever merely
+        // flew off screen without being hit is retired here instead, on the way out.
+        let world = &mut self.world;
+        self.bullets.retain(|bullet| {
+            if !bullet.alive() {
+                return false;
+            }
+            if bullet.outside(world) {
+                world.retire(bullet.member());
+                return false;
+            }
+            true
+        });
+
+        let world = &mut self.world;
+        let bullets = &mut self.bullets;
+        let score = &mut self.score;
         self.enemy_aircrafts.retain_mut(|aircraft| {
-            if matches!(self.scene, Scene::Game { .. }) {
-                aircraft.shoot(ctx, &mut self.bullets);
+            if in_game {
+                aircraft.shoot(ctx, world, bullets);
             }
-            let keep = aircraft.alive() && !aircraft.outside();
+            let keep = aircraft.alive() && !aircraft.outside(world);
             // The aircraft is the only one that knows a shot of ours took it down rather than a
-            // ram, and it is dropped exactly once — so the bump rides the drop.
+            // ram, and it is dropped exactly once — so the bump rides the drop. A dead one
+            // already gave its seat back in `destroy`.
             if !keep && aircraft.died_to_shot() {
-                self.score += DESTORY_SCORE_BUMP as u32;
+                *score += DESTORY_SCORE_BUMP as u32;
             }
-            // Only a live escape earns the let-go points.
-            if aircraft.alive() && aircraft.outside() {
-                self.score += LET_GO_SCORE_BUMP as u32;
+            // Only a live escape earns the let-go points, and only a live escape still holds a
+            // seat to give back here — a shot-down or rammed aircraft retired itself already.
+            if aircraft.alive() && aircraft.outside(world) {
+                *score += LET_GO_SCORE_BUMP as u32;
+                world.retire(aircraft.member());
             }
 
             keep
@@ -110,17 +148,26 @@ impl Cart {
             !explosion.finished()
         });
 
-        self.the_lady.shoot(ctx, &mut self.bullets);
+        self.the_lady.shoot(ctx, &mut self.world, &mut self.bullets);
 
-        if matches!(self.scene, Scene::Game { .. }) {
+        if in_game {
             // Spawn an enemy aircraft every 1-4 seconds in game mode.
             let timeout = ctx.random(1.0..4.0);
             if time - self.last_enemy_ts > timeout {
-                self.enemy_aircrafts
-                    .push(EnemyAircraft::new(ctx))
-                    .unwrap_or_else(|_| {
+                match EnemyAircraft::new(ctx, &mut self.world) {
+                    Some(aircraft) => {
+                        // The vec can be full while the world still had a seat: the refused
+                        // aircraft comes back out of the error so its seat can be given back,
+                        // or the seat would be orphaned past every restart.
+                        if let Err(aircraft) = self.enemy_aircrafts.push(aircraft) {
+                            self.world.retire(aircraft.member());
+                            logf!(ctx, "Err: Too many aircrafts: {}", MAX_ENEMY_AIRCRAFTS);
+                        }
+                    }
+                    None => {
                         logf!(ctx, "Err: Too many aircrafts: {}", MAX_ENEMY_AIRCRAFTS);
-                    });
+                    }
+                }
                 self.last_enemy_ts = time;
             }
         }
@@ -129,46 +176,38 @@ impl Cart {
     /// One update of everything that flies: each of them writes down where it means to go, and
     /// the world takes the whole cast there together.
     fn fly(&mut self, ctx: &mut Context, state: &CartState) {
-        self.the_lady.steer(ctx, state);
+        self.the_lady.steer(ctx, state, &mut self.world);
         for aircraft in &mut self.enemy_aircrafts {
-            aircraft.steer(ctx, state);
+            aircraft.steer(ctx, state, &mut self.world);
         }
         // A bullet holds the course it was fired on, so there is nothing to steer it with.
 
-        let mut cast: Cast<MAX_CAST> = Cast::new();
-        // The world tells both parties of a meeting, whichever one's movement made it, so a hit
-        // is mutual however the cast is ordered and neither party has to be kept alive for the
-        // other to notice. What the order still decides is *where* everybody is met, and it runs
-        // from the fastest thing in the air to the slowest: the shots, then the aircrafts they
-        // are aimed at, and the lady last of all — everything is stepped where its target now
-        // stands, so a shot lands the frame it reaches rather than a frame behind. A dead lady is
-        // left out altogether: her wreck is nothing for an aircraft to ram. No push can fail — the
-        // cast is the shots, the aircrafts and the lady, and `MAX_CAST` is exactly that many.
-        for bullet in &mut self.bullets {
-            let _ = cast.push(bullet.as_kinetic());
-        }
-        for aircraft in &mut self.enemy_aircrafts {
-            let _ = cast.push(aircraft.as_kinetic());
-        }
-        if self.the_lady.alive() {
-            let _ = cast.push(self.the_lady.as_kinetic());
-        }
-        // Nothing bends any of them — helicopters fly where they are pointed and shots go
-        // straight — so the world is handed no forces at all.
-        self.world.step(ctx, &mut cast);
+        // The world owns the whole cast now — bullets, aircraft and the lady each keep a seat in
+        // it rather than being gathered here — so what used to be *cast order* is *seat order*:
+        // whoever holds the lowest empty seat when it is enlisted is stepped first, and meets
+        // everybody stepped before it where it has *just* moved to. Bullets and aircraft come and
+        // go every update, and a freed seat is the next one `enlist` hands out, so which seat
+        // ends up ahead of which shifts update to update — there is no "shots, then aircraft,
+        // then the lady" left to preserve, and nothing here tries to force one back with seat
+        // gymnastics. What does not shift: the world tells both parties of a meeting, whichever
+        // one's movement made it, so a hit lands mutually however the cast happens to be seated,
+        // and neither party has to survive the step for the other to hear of it.
+        self.world.step(ctx);
     }
 
     /// What each of them makes of the step it has just taken, read from its own contacts.
     ///
     /// Same frame and both ways round: the shot that lands and the target it lands on are told of
-    /// each other here, and either may die of it before anything is drawn.
+    /// each other here, and either may die of it — and give its seat back — before anything is
+    /// drawn.
     fn react(&mut self, ctx: &mut Context) {
-        self.the_lady.react(ctx, &mut self.explosions);
+        self.the_lady
+            .react(ctx, &mut self.world, &mut self.explosions);
         for aircraft in &mut self.enemy_aircrafts {
-            aircraft.react(ctx, &mut self.explosions);
+            aircraft.react(ctx, &mut self.world, &mut self.explosions);
         }
         for bullet in &mut self.bullets {
-            bullet.react(ctx, &mut self.explosions);
+            bullet.react(ctx, &mut self.world, &mut self.explosions);
         }
     }
 
@@ -181,9 +220,8 @@ impl Cart {
         }
         self.smap.stop_scrolling();
 
-        // Can't be `None` because we ensure it's initialized at the very start of `update`.
-        if self.score > self.high_score.unwrap() {
-            self.high_score.replace(self.score);
+        if self.score > self.high_score {
+            self.high_score = self.score;
             ctx.storage_set("high-score", self.score).unwrap();
         }
     }
@@ -191,7 +229,7 @@ impl Cart {
     fn state(&self) -> CartState {
         CartState {
             scene: self.scene.clone(),
-            protoganist_pos: self.the_lady.body().draw_pos().into(),
+            protoganist_pos: self.the_lady.draw_pos(&self.world).into(),
         }
     }
 
@@ -200,29 +238,33 @@ impl Cart {
             printf!(gfx, SCORE_POS.x, SCORE_POS.y, SCORE_COLOR, "{}", self.score);
         }
 
-        let high = self.high_score.unwrap_or(0);
-        if high > 0 {
+        if self.high_score > 0 {
             printf!(
                 gfx,
                 HIGH_SCORE_POS.x,
                 HIGH_SCORE_POS.y,
                 SCORE_COLOR,
                 "{:5}",
-                high,
+                self.high_score,
             );
         }
     }
 }
 
 impl Game for Cart {
+    fn boot(&mut self, ctx: &mut Context) {
+        // Everything the constant preset could not say: the high score is the store's to give,
+        // and the lady's first seat is the world's — the very thing `start` already does on every
+        // restart after this one.
+        self.high_score = ctx
+            .storage_get("high-score")
+            .as_ref()
+            .and_then(StorageValue::as_i64)
+            .unwrap_or(0) as u32;
+        self.the_lady = TheLady::new(&mut self.world);
+    }
+
     fn update(&mut self, ctx: &mut Context) {
-        // Initialize the high score, if needed.
-        self.high_score.get_or_insert_with(|| {
-            ctx.storage_get("high-score")
-                .as_ref()
-                .and_then(StorageValue::as_i64)
-                .unwrap_or(0) as u32
-        });
         self.smap.update(ctx);
 
         // The scene as the cast finds it — which is where the aircrafts read the lady off, so it
@@ -265,13 +307,15 @@ impl Game for Cart {
         gfx.clear(Color::BLACK);
         self.smap.draw(gfx);
 
-        self.the_lady.draw(gfx, &self.state());
+        self.the_lady.draw(gfx, &self.state(), &self.world);
 
-        self.bullets.iter().for_each(|b| b.draw(gfx, &self.state()));
+        self.bullets
+            .iter()
+            .for_each(|b| b.draw(gfx, &self.state(), &self.world));
         self.explosions.iter().for_each(|e| e.draw(gfx));
         self.enemy_aircrafts
             .iter()
-            .for_each(|b| b.draw(gfx, &self.state()));
+            .for_each(|b| b.draw(gfx, &self.state(), &self.world));
 
         let msg = match self.scene {
             Scene::Start => Some("Press O to start"),
@@ -308,13 +352,13 @@ pub(crate) enum Scene {
     },
 }
 
-// Sized so the whole sky fits the wire: the lady, every aircraft and every shot in flight sum
-// to exactly the sixty-four cast members one step carries. Forty-seven shots at once is far past
-// what the fire rates can put in the air; a shot past the cap is refused where it is fired.
+// Sized so the whole sky fits in one world: the lady, every aircraft and every shot in flight sum
+// to exactly the sixty-four seats a `World` can have. Forty-seven shots at once is far past what
+// the fire rates can put in the air; a shot past the cap is refused where it is fired.
 const MAX_BULLETS: usize = 47;
 const MAX_ENEMY_AIRCRAFTS: usize = 16;
-// The lady, every aircraft in the air and every shot either side has in flight: everything the
-// world is handed each update, and the capacity of the cast that hands it over.
+/// The lady, every aircraft in the air and every shot either side has in flight: everybody the
+/// world can seat at once, and so the size of the `Sky` that seats them.
 const MAX_CAST: usize = 1 + MAX_ENEMY_AIRCRAFTS + MAX_BULLETS;
 const MAX_EXPLOSIONS: usize = MAX_ENEMY_AIRCRAFTS + 8;
 // 3 seconds.
