@@ -2,10 +2,9 @@ use core::num::NonZeroU8;
 
 use heapless::VecView;
 use pixel8::{
-    physics::{Bounds, Contacts, Kinetic, Velocity},
+    physics::{Member, Velocity},
     plume::Explosion,
-    BitFlags, Body, Button, Color, Context, SfxId, SpriteFlag, SpriteId, SCREEN_HEIGHT,
-    SCREEN_WIDTH,
+    Button, Color, Context, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH,
 };
 
 use crate::{
@@ -13,37 +12,80 @@ use crate::{
     entity::{self, Entity},
     rotor::Rotor,
     shooter::{BulletProps, Shooter},
-    CartState, Scene,
+    CartState, Scene, Sky,
 };
 
 #[derive(Debug)]
 pub struct TheLady {
-    body: Body,
-    velocity: Velocity,
-    /// What the world's last step ran into: an aircraft, or a shot of theirs. The world writes it
-    /// and she reads it, in the same update.
-    contacts: Contacts,
+    /// Her seat: where she is, how fast, and what her last step ran into — an aircraft, or a shot
+    /// of theirs. The world writes it and `react` reads it, in the same update.
+    member: Member,
     main_rotor: Rotor,
     tail_rotor: Rotor,
     last_bullet: f32,
     alive: bool,
+    /// Where she last drew, cached the moment she dies. Dead, her seat is retired — nothing meets
+    /// her wreck — but an aircraft still chases wherever she went down, and that is read off here
+    /// rather than off a seat that no longer exists.
+    last_pos: (i16, i16),
 }
 
 impl TheLady {
-    pub fn new() -> Self {
+    /// The lady as the cart ships: everything about her settled except where she stands, which is
+    /// the world's and needs a seat. A constant, so she can sit in the cart's opening state as
+    /// written rather than built.
+    pub const fn waiting() -> Self {
         Self {
-            body: Body::new(STARTING_POSITION.x as f32, STARTING_POSITION.y as f32),
-            velocity: Velocity::default(),
-            contacts: Contacts::default(),
+            member: Member::NOBODY,
             main_rotor: Rotor::new(MAIN_ROTOR_OFFSET, MAIN_ROTOR_LENGTH),
             tail_rotor: Rotor::new(TAIL_ROTOR_OFFSET, TAIL_ROTOR_LENGTH),
             last_bullet: 0.0,
             alive: true,
+            last_pos: (0, 0),
         }
     }
 
-    fn move_it(&mut self, ctx: &mut Context) {
-        let bounds = self.bounds();
+    /// Seats her in `world`, at boot and at the start of every run after.
+    pub fn new(world: &mut Sky) -> Self {
+        let member = world
+            .enlist(
+                STARTING_POSITION.x as f32,
+                STARTING_POSITION.y as f32,
+                WIDTH,
+                HEIGHT,
+            )
+            .expect("a seat for the lady")
+            // The cell she is drawn from, whose `LADY` flag is what an aircraft hunting her —
+            // and every shot aimed at her — is told it met.
+            .wearing(SPRITE_ID)
+            // A ram or a shot, which is the whole of what can end her — the same pair `react`
+            // asks about. Our own shots stream past her every update and are none of her
+            // business.
+            .heeding(AIRCRAFT | ENEMY_SHOT)
+            .member();
+
+        Self {
+            member,
+            main_rotor: Rotor::new(MAIN_ROTOR_OFFSET, MAIN_ROTOR_LENGTH),
+            tail_rotor: Rotor::new(TAIL_ROTOR_OFFSET, TAIL_ROTOR_LENGTH),
+            last_bullet: 0.0,
+            alive: true,
+            last_pos: (0, 0),
+        }
+    }
+
+    /// Where she draws: her seat's, while she is in the cast, and the position she died at once
+    /// she has been retired out of it.
+    pub fn draw_pos(&self, world: &Sky) -> (i16, i16) {
+        if self.alive {
+            world.draw_pos(self.member)
+        } else {
+            self.last_pos
+        }
+    }
+
+    fn move_it(&mut self, ctx: &mut Context, world: &mut Sky) {
+        let bounds = world.bounds(self.member);
         let buttons = ctx.buttons_down();
 
         // An axis at a time, and each of them only while there is screen left on that side, so a
@@ -62,7 +104,7 @@ impl TheLady {
             velocity.dy += SPEED;
         }
 
-        self.velocity = velocity;
+        world.set_velocity(self.member, velocity);
     }
 }
 
@@ -85,47 +127,13 @@ impl Shooter for TheLady {
     }
 }
 
-impl Kinetic for TheLady {
-    fn body(&self) -> &Body {
-        &self.body
-    }
-
-    fn body_mut(&mut self) -> &mut Body {
-        &mut self.body
-    }
-
-    fn velocity_mut(&mut self) -> &mut Velocity {
-        &mut self.velocity
-    }
-
-    fn contacts(&self) -> &Contacts {
-        &self.contacts
-    }
-
-    fn contacts_mut(&mut self) -> &mut Contacts {
-        &mut self.contacts
-    }
-
-    fn bounds(&self) -> Bounds {
-        Bounds::of(&self.body, WIDTH, HEIGHT)
-    }
-
-    /// The cell she is drawn from, whose `LADY` flag is what an aircraft hunting her — and every
-    /// shot aimed at her — is told it met.
-    fn sprite(&self) -> Option<SpriteId> {
-        Some(SPRITE_ID)
-    }
-
-    /// A ram or a shot, which is the whole of what can end her — the same pair `react` asks
-    /// about. Our own shots stream past her every update and are none of her business.
-    fn heeds(&self) -> BitFlags<SpriteFlag> {
-        AIRCRAFT | ENEMY_SHOT
-    }
-}
-
 impl Entity for TheLady {
     fn entity_type(&self) -> entity::Type {
         entity::Type::Protoganist
+    }
+
+    fn member(&self) -> Member {
+        self.member
     }
 
     fn alive(&self) -> bool {
@@ -135,41 +143,47 @@ impl Entity for TheLady {
         &mut self.alive
     }
 
-    fn steer(&mut self, ctx: &mut Context, state: &CartState) {
+    fn steer(&mut self, ctx: &mut Context, state: &CartState, world: &mut Sky) {
         if !self.alive {
             return;
         }
         if matches!(state.scene, Scene::Game { .. }) {
-            self.move_it(ctx);
+            self.move_it(ctx, world);
         } else {
             // Nothing to fly her with between games; she holds her hover.
-            self.velocity = Velocity::default();
+            world.set_velocity(self.member, Velocity::default());
         }
     }
 
-    fn react(&mut self, ctx: &mut Context, explosions: &mut VecView<Explosion>) {
+    fn react(&mut self, ctx: &mut Context, world: &mut Sky, explosions: &mut VecView<Explosion>) {
         if !self.alive {
             return;
         }
+
+        // Read before `destroy` can retire the seat, so the rotors still have somewhere to draw
+        // themselves from on the update she dies, and so a dead lady's last position survives the
+        // retiring for `draw_pos` to hand back afterwards.
+        let pos = world.draw_pos(self.member);
+
         // A ram or a shot; either is the end of her, and she asks after nothing else.
-        if self.contacts.touches(AIRCRAFT | ENEMY_SHOT) {
-            self.destroy(ctx, explosions);
+        if world.contacts(self.member).touches(AIRCRAFT | ENEMY_SHOT) {
+            self.last_pos = pos;
+            self.destroy(ctx, world, explosions);
             ctx.sfx(DESTROY_SFX);
         }
 
-        let pos = self.body.draw_pos().into();
-        self.main_rotor.update(pos);
-        self.tail_rotor.update(pos);
+        self.main_rotor.update(pos.into());
+        self.tail_rotor.update(pos.into());
     }
 
-    fn draw(&self, gfx: &mut pixel8::Graphics, state: &CartState) {
+    fn draw(&self, gfx: &mut pixel8::Graphics, state: &CartState, world: &Sky) {
         if !self.alive {
             return;
         }
 
         gfx.set_transparent_color(Color::BLACK, false);
         gfx.set_transparent_color(Color::DARK_GREY, true);
-        self.draw_default(gfx, state);
+        self.draw_default(gfx, state, world);
         gfx.reset_transparency();
 
         self.main_rotor.draw(gfx);

@@ -16,7 +16,7 @@ pub struct Rotor {
 }
 
 impl Rotor {
-    pub fn new(offset: Position, length: NonZeroU8) -> Self {
+    pub const fn new(offset: Position, length: NonZeroU8) -> Self {
         Self {
             angle: 0.0,
             offset,

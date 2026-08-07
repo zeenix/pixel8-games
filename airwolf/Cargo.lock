@@ -45,7 +45,7 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 [[package]]
 name = "pixel8"
 version = "0.1.0"
-source = "git+https://github.com/zeenix/pixel8#751950644fcfa0e500b6c097e070d9ac7c985844"
+source = "git+https://github.com/zeenix/pixel8#8a6cab5df5b8d3041dd7187cf924819dcf46d545"
 dependencies = [
  "heapless",
 ]

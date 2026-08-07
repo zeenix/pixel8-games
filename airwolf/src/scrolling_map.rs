@@ -7,7 +7,7 @@ pub struct ScrollingMap {
 }
 
 impl ScrollingMap {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             scroll: -(SCREEN_HEIGHT as f32),
             scrolling: true,

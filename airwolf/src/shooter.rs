@@ -1,7 +1,7 @@
 use heapless::VecView;
-use pixel8::{logf, Context};
+use pixel8::{logf, Button, Context};
 
-use crate::{bullet::Bullet, entity::Entity};
+use crate::{bullet::Bullet, entity::Entity, Sky};
 
 pub trait Shooter: Entity {
     /// The bullet properties.
@@ -12,28 +12,39 @@ pub trait Shooter: Entity {
     /// Reset the time last bullet was fired by this shooter to the current time.
     fn reset_last_bullet(&mut self, ctx: &Context);
 
-    fn shoot(&mut self, ctx: &mut Context, bullets: &mut VecView<Bullet>) {
-        if !self.alive()
-            || !self.bullet_cool_down(ctx)
-            || !self.is_enemy() && !ctx.btn(pixel8::Button::O)
-        {
+    fn shoot(&mut self, ctx: &mut Context, world: &mut Sky, bullets: &mut VecView<Bullet>) {
+        if !self.alive() || !self.bullet_cool_down(ctx) || !self.is_enemy() && !ctx.btn(Button::O) {
             return;
         }
 
         let bprops = self.bullet_props();
-        let (x, y) = self.body().draw_pos();
+        let (x, y) = world.draw_pos(self.member());
         let x = x as f32 + bprops.x_offset;
         let y = y as f32 + bprops.y_offset;
+        // The world is asked for a seat before the shooter's own cooldown is spent, but either
+        // way it is spent once this decides to fire — a shot refused for want of a seat still
+        // costs the cooldown, exactly as a shot that made it into the sky always has.
         let bullet = if self.is_enemy() {
-            Bullet::new_enemy(x, y, ctx)
+            Bullet::new_enemy(x, y, ctx, world)
         } else {
-            Bullet::new_friendly(x, y, ctx)
+            Bullet::new_friendly(x, y, ctx, world)
         };
         self.reset_last_bullet(ctx);
 
-        bullets.push(bullet).unwrap_or_else(|_| {
-            logf!(ctx, "Err: Too many bullets: {}", super::MAX_BULLETS);
-        })
+        match bullet {
+            Some(bullet) => {
+                // The vec can be full while the world still had a seat to give. The refused
+                // bullet comes back out of the error, and its seat goes back with it — dropped
+                // unretired, the seat would be nobody's for good, since no handle to it survives.
+                if let Err(bullet) = bullets.push(bullet) {
+                    world.retire(bullet.member());
+                    logf!(ctx, "Err: Too many bullets: {}", super::MAX_BULLETS);
+                }
+            }
+            None => {
+                logf!(ctx, "Err: Too many bullets: {}", super::MAX_BULLETS);
+            }
+        }
     }
 
     /// Returns true if there has been sufficient time since the last bullet.
