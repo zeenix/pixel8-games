@@ -1,5 +1,5 @@
 use heapless::VecView;
-use pixel8::{logf, physics::Member, plume::Explosion, Context, Graphics};
+use pixel8::{logf, physics::Member, plume::Explosion, Context};
 
 use crate::{CartState, Sky};
 
@@ -34,31 +34,6 @@ pub trait Entity: 'static {
     /// shows up outside itself. `world` is `&mut` because dying is answered here too — see
     /// [`destroy`](Self::destroy).
     fn react(&mut self, ctx: &mut Context, world: &mut Sky, explosions: &mut VecView<Explosion>);
-
-    fn draw(&self, gfx: &mut Graphics, state: &CartState, world: &Sky) {
-        self.draw_default(gfx, state, world);
-    }
-
-    fn draw_default(&self, gfx: &mut Graphics, _state: &CartState, world: &Sky) {
-        let bounds = world.bounds(self.member());
-        // The cell an entity wears is the cell it is drawn from, and the world owns it: what the
-        // player sees and what everybody else meets can never be two different sprites. Everything
-        // here wears one.
-        let Some(sprite) = world.sprite(self.member()) else {
-            return;
-        };
-
-        gfx.sprite_ext(
-            sprite,
-            bounds.x(),
-            bounds.y(),
-            bounds.width(),
-            bounds.height(),
-            false,
-            false,
-        )
-        .unwrap();
-    }
 
     /// Returns `true` if the entity is outside the screen.
     fn outside(&self, world: &Sky) -> bool {

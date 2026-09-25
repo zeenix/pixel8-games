@@ -13,8 +13,13 @@ use heapless::Vec;
 use pixel8::{physics::World, plume::Explosion, *};
 
 use crate::{
-    bullet::Bullet, common::Position, enemy_aircraft::EnemyAircraft, entity::Entity,
-    scrolling_map::ScrollingMap, shooter::Shooter, the_lady::TheLady,
+    bullet::Bullet,
+    common::{Position, AIRCRAFT, ENEMY_SHOT, FRIENDLY_SHOT, LADY},
+    enemy_aircraft::EnemyAircraft,
+    entity::Entity,
+    scrolling_map::ScrollingMap,
+    shooter::Shooter,
+    the_lady::TheLady,
 };
 
 pixel8::game!(Cart = Cart::new());
@@ -307,15 +312,21 @@ impl Game for Cart {
         gfx.clear(Color::BLACK);
         self.smap.draw(gfx);
 
-        self.the_lady.draw(gfx, &self.state(), &self.world);
+        // The lady first, as the scene has always been layered: her sprite's black is paint and
+        // its dark grey is the sky showing through, so her layer is drawn under a transparency of
+        // its own.
+        gfx.set_transparent_color(Color::BLACK, false);
+        gfx.set_transparent_color(Color::DARK_GREY, true);
+        self.world.draw(gfx, LADY);
+        gfx.reset_transparency();
+        self.the_lady.draw_rotors(gfx);
 
-        self.bullets
-            .iter()
-            .for_each(|b| b.draw(gfx, &self.state(), &self.world));
+        // Every shot in flight, the blasts over them, and the aircraft over those: the world draws
+        // each layer of its cast where the step left it, and the explosions are the cart's own.
+        self.world.draw(gfx, FRIENDLY_SHOT | ENEMY_SHOT);
         self.explosions.iter().for_each(|e| e.draw(gfx));
-        self.enemy_aircrafts
-            .iter()
-            .for_each(|b| b.draw(gfx, &self.state(), &self.world));
+        self.world.draw(gfx, AIRCRAFT);
+        self.enemy_aircrafts.iter().for_each(|a| a.draw_rotors(gfx));
 
         let msg = match self.scene {
             Scene::Start => Some("Press O to start"),

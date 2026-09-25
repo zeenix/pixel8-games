@@ -4,7 +4,7 @@ use heapless::VecView;
 use pixel8::{
     physics::{Member, Velocity},
     plume::Explosion,
-    Context, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH,
+    Context, Graphics, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH,
 };
 
 use crate::{
@@ -73,6 +73,12 @@ impl EnemyAircraft {
 
         world.set_velocity(self.member, Velocity::new(dx, SPEED));
     }
+
+    /// Its rotors, drawn over wherever the world drew it.
+    pub fn draw_rotors(&self, gfx: &mut Graphics) {
+        self.main_rotor.draw(gfx);
+        self.tail_rotor.draw(gfx);
+    }
 }
 
 impl Shooter for EnemyAircraft {
@@ -137,13 +143,6 @@ impl Entity for EnemyAircraft {
 
         self.main_rotor.update(pos.into());
         self.tail_rotor.update(pos.into());
-    }
-
-    fn draw(&self, gfx: &mut pixel8::Graphics, state: &CartState, world: &Sky) {
-        self.draw_default(gfx, state, world);
-
-        self.main_rotor.draw(gfx);
-        self.tail_rotor.draw(gfx);
     }
 
     // Override the "outside" definition since the aircraft is spawned above the screen.

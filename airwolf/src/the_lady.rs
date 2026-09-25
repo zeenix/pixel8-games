@@ -4,7 +4,7 @@ use heapless::VecView;
 use pixel8::{
     physics::{Member, Velocity},
     plume::Explosion,
-    Button, Color, Context, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH,
+    Button, Context, Graphics, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH,
 };
 
 use crate::{
@@ -82,6 +82,16 @@ impl TheLady {
         } else {
             self.last_pos
         }
+    }
+
+    /// Her rotors, drawn over wherever the world drew her — while she is alive to have any.
+    pub fn draw_rotors(&self, gfx: &mut Graphics) {
+        if !self.alive {
+            return;
+        }
+
+        self.main_rotor.draw(gfx);
+        self.tail_rotor.draw(gfx);
     }
 
     fn move_it(&mut self, ctx: &mut Context, world: &mut Sky) {
@@ -174,20 +184,6 @@ impl Entity for TheLady {
 
         self.main_rotor.update(pos.into());
         self.tail_rotor.update(pos.into());
-    }
-
-    fn draw(&self, gfx: &mut pixel8::Graphics, state: &CartState, world: &Sky) {
-        if !self.alive {
-            return;
-        }
-
-        gfx.set_transparent_color(Color::BLACK, false);
-        gfx.set_transparent_color(Color::DARK_GREY, true);
-        self.draw_default(gfx, state, world);
-        gfx.reset_transparency();
-
-        self.main_rotor.draw(gfx);
-        self.tail_rotor.draw(gfx);
     }
 }
 
