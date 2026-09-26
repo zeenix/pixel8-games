@@ -1,5 +1,9 @@
 use heapless::VecView;
-use pixel8::{physics::Member, plume::Explosion, Context, SfxId, SpriteId};
+use pixel8::{
+    physics::{Member, MemberId},
+    plume::Explosion,
+    Context, SfxId, SpriteId,
+};
 
 use crate::{
     common::{AIRCRAFT, LADY},
@@ -11,7 +15,7 @@ use crate::{
 pub struct Bullet {
     /// The bullet's seat: where it is, and the one thing it ever asks the world afterwards —
     /// whether it has arrived at what it was fired at.
-    member: Member,
+    member: MemberId,
     entity_type: entity::Type,
     alive: bool,
 }
@@ -50,12 +54,11 @@ impl Bullet {
         // here so the world never works out anything else this shot flew past.
         let heeds = if is_enemy { LADY } else { AIRCRAFT };
 
-        let member = world
-            .enlist(x, y, width, height)?
+        let member = Member::builder(x, y, width, height)
             .moving(0.0, dy)
             .wearing(sprite)
             .heeding(heeds)
-            .member();
+            .enlist(world)?;
 
         Some(Self {
             member,
@@ -70,7 +73,7 @@ impl Entity for Bullet {
         self.entity_type
     }
 
-    fn member(&self) -> Member {
+    fn member(&self) -> MemberId {
         self.member
     }
 
@@ -85,7 +88,7 @@ impl Entity for Bullet {
         // Each side's shot is spent on the other side's target and on nothing else — not on its
         // own kind, and not on the thing that fired it.
         let target = if self.is_enemy() { LADY } else { AIRCRAFT };
-        if world.contacts(self.member).touches(target) {
+        if world.member(self.member).contacts().touches(target) {
             self.destroy(ctx, world, explosions);
         }
     }

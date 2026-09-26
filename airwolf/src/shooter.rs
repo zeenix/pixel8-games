@@ -18,7 +18,7 @@ pub trait Shooter: Entity {
         }
 
         let bprops = self.bullet_props();
-        let (x, y) = world.draw_pos(self.member());
+        let (x, y) = world.member(self.member()).draw_pos();
         let x = x as f32 + bprops.x_offset;
         let y = y as f32 + bprops.y_offset;
         // The world is asked for a seat before the shooter's own cooldown is spent, but either
@@ -37,7 +37,7 @@ pub trait Shooter: Entity {
                 // bullet comes back out of the error, and its seat goes back with it — dropped
                 // unretired, the seat would be nobody's for good, since no handle to it survives.
                 if let Err(bullet) = bullets.push(bullet) {
-                    world.retire(bullet.member());
+                    world.member_mut(bullet.member()).retire();
                     logf!(ctx, "Err: Too many bullets: {}", super::MAX_BULLETS);
                 }
             }
