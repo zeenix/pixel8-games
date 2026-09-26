@@ -30,8 +30,8 @@ pub(crate) type Sky = World<MAX_CAST>;
 
 struct Cart {
     /// The one thing that moves anything in this cart, and the one thing that owns where
-    /// everybody is: bullets, aircraft and the lady each keep a `Member` handle into it beside
-    /// their own game data, rather than a position of their own.
+    /// everybody is: bullets, aircraft and the lady each keep the `MemberId` of their seat in it
+    /// beside their own game data, rather than a position of their own.
     world: Sky,
     bullets: Vec<Bullet, MAX_BULLETS>,
     explosions: Vec<Explosion, MAX_EXPLOSIONS>,
@@ -80,13 +80,13 @@ impl Cart {
         // here, and so does the lady's — whether she is still alive (the very first `start`,
         // nothing having killed her yet) or was already retired when she died.
         for bullet in self.bullets.drain(..) {
-            self.world.retire(bullet.member());
+            self.world.member_mut(bullet.member()).retire();
         }
         for aircraft in self.enemy_aircrafts.drain(..) {
-            self.world.retire(aircraft.member());
+            self.world.member_mut(aircraft.member()).retire();
         }
-        if self.world.seated(self.the_lady.member()) {
-            self.world.retire(self.the_lady.member());
+        if let Some(lady) = self.world.get_member_mut(self.the_lady.member()) {
+            lady.retire();
         }
 
         self.explosions.clear();
@@ -119,7 +119,7 @@ impl Cart {
                 return false;
             }
             if bullet.outside(world) {
-                world.retire(bullet.member());
+                world.member_mut(bullet.member()).retire();
                 return false;
             }
             true
@@ -143,7 +143,7 @@ impl Cart {
             // seat to give back here — a shot-down or rammed aircraft retired itself already.
             if aircraft.alive() && aircraft.outside(world) {
                 *score += LET_GO_SCORE_BUMP as u32;
-                world.retire(aircraft.member());
+                world.member_mut(aircraft.member()).retire();
             }
 
             keep
@@ -165,7 +165,7 @@ impl Cart {
                         // aircraft comes back out of the error so its seat can be given back,
                         // or the seat would be orphaned past every restart.
                         if let Err(aircraft) = self.enemy_aircrafts.push(aircraft) {
-                            self.world.retire(aircraft.member());
+                            self.world.member_mut(aircraft.member()).retire();
                             logf!(ctx, "Err: Too many aircrafts: {}", MAX_ENEMY_AIRCRAFTS);
                         }
                     }

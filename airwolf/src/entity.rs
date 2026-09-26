@@ -1,20 +1,20 @@
 use heapless::VecView;
-use pixel8::{logf, physics::Member, plume::Explosion, Context};
+use pixel8::{logf, physics::MemberId, plume::Explosion, Context};
 
 use crate::{CartState, Sky};
 
 /// What the game makes of an entity, on top of the seat the world gives it.
 ///
-/// Where a thing is, what it covers and what it has just run into are the world's, asked for with
-/// [`member`](Self::member). This is what airwolf itself has to say about one — which side of the
-/// fight it is on, where it means to go this update, and what the world's report of that step costs
-/// it.
+/// Where a thing is, what it covers and what it has just run into are the world's, asked of the
+/// member [`member`](Self::member) names. This is what airwolf itself has to say about one — which
+/// side of the fight it is on, where it means to go this update, and what the world's report of
+/// that step costs it.
 pub trait Entity: 'static {
     fn entity_type(&self) -> Type;
 
     /// This entity's seat in the world: where it is, how fast, what it covers and what its last
-    /// step ran into are all asked for with this.
-    fn member(&self) -> Member;
+    /// step ran into are all asked of the member this names, borrowed from the world.
+    fn member(&self) -> MemberId;
 
     /// Wether this entity is still alive.
     fn alive(&self) -> bool;
@@ -37,7 +37,7 @@ pub trait Entity: 'static {
 
     /// Returns `true` if the entity is outside the screen.
     fn outside(&self, world: &Sky) -> bool {
-        !world.bounds(self.member()).on_screen()
+        !world.member(self.member()).bounds().on_screen()
     }
 
     /// Die, leave a blast where it was, and give the seat back.
@@ -46,8 +46,9 @@ pub trait Entity: 'static {
     /// cast from this update on: nothing enlisted after this meets it, wherever its wreck sits.
     fn destroy(&mut self, ctx: &mut Context, world: &mut Sky, explosions: &mut VecView<Explosion>) {
         *self.alive_mut() = false;
-        let (x, y) = world.draw_pos(self.member());
-        world.retire(self.member());
+        let member = world.member_mut(self.member());
+        let (x, y) = member.draw_pos();
+        member.retire();
         explosions.push(Explosion::new(x, y)).unwrap_or_else(|_| {
             logf!(ctx, "Err: Too many explosions: {}", super::MAX_EXPLOSIONS);
         });

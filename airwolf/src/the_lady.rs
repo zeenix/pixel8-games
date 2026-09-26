@@ -2,7 +2,7 @@ use core::num::NonZeroU8;
 
 use heapless::VecView;
 use pixel8::{
-    physics::{Member, Velocity},
+    physics::{Member, MemberId, Velocity},
     plume::Explosion,
     Button, Context, Graphics, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH,
 };
@@ -19,7 +19,7 @@ use crate::{
 pub struct TheLady {
     /// Her seat: where she is, how fast, and what her last step ran into — an aircraft, or a shot
     /// of theirs. The world writes it and `react` reads it, in the same update.
-    member: Member,
+    member: MemberId,
     main_rotor: Rotor,
     tail_rotor: Rotor,
     last_bullet: f32,
@@ -36,7 +36,7 @@ impl TheLady {
     /// written rather than built.
     pub const fn waiting() -> Self {
         Self {
-            member: Member::NOBODY,
+            member: MemberId::NOBODY,
             main_rotor: Rotor::new(MAIN_ROTOR_OFFSET, MAIN_ROTOR_LENGTH),
             tail_rotor: Rotor::new(TAIL_ROTOR_OFFSET, TAIL_ROTOR_LENGTH),
             last_bullet: 0.0,
@@ -47,22 +47,20 @@ impl TheLady {
 
     /// Seats her in `world`, at boot and at the start of every run after.
     pub fn new(world: &mut Sky) -> Self {
-        let member = world
-            .enlist(
-                STARTING_POSITION.x as f32,
-                STARTING_POSITION.y as f32,
-                WIDTH,
-                HEIGHT,
-            )
-            .expect("a seat for the lady")
-            // The cell she is drawn from, whose `LADY` flag is what an aircraft hunting her —
-            // and every shot aimed at her — is told it met.
-            .wearing(SPRITE_ID)
-            // A ram or a shot, which is the whole of what can end her — the same pair `react`
-            // asks about. Our own shots stream past her every update and are none of her
-            // business.
-            .heeding(AIRCRAFT | ENEMY_SHOT)
-            .member();
+        let member = Member::builder(
+            STARTING_POSITION.x as f32,
+            STARTING_POSITION.y as f32,
+            WIDTH,
+            HEIGHT,
+        )
+        // The cell she is drawn from, whose `LADY` flag is what an aircraft hunting her — and
+        // every shot aimed at her — is told it met.
+        .wearing(SPRITE_ID)
+        // A ram or a shot, which is the whole of what can end her — the same pair `react` asks
+        // about. Our own shots stream past her every update and are none of her business.
+        .heeding(AIRCRAFT | ENEMY_SHOT)
+        .enlist(world)
+        .expect("a seat for the lady");
 
         Self {
             member,
@@ -78,7 +76,7 @@ impl TheLady {
     /// she has been retired out of it.
     pub fn draw_pos(&self, world: &Sky) -> (i16, i16) {
         if self.alive {
-            world.draw_pos(self.member)
+            world.member(self.member).draw_pos()
         } else {
             self.last_pos
         }
@@ -95,7 +93,8 @@ impl TheLady {
     }
 
     fn move_it(&mut self, ctx: &mut Context, world: &mut Sky) {
-        let bounds = world.bounds(self.member);
+        let mut lady = world.member_mut(self.member);
+        let bounds = lady.bounds();
         let buttons = ctx.buttons_down();
 
         // An axis at a time, and each of them only while there is screen left on that side, so a
@@ -114,7 +113,7 @@ impl TheLady {
             velocity.dy += SPEED;
         }
 
-        world.set_velocity(self.member, velocity);
+        lady.set_velocity(velocity);
     }
 }
 
@@ -142,7 +141,7 @@ impl Entity for TheLady {
         entity::Type::Protoganist
     }
 
-    fn member(&self) -> Member {
+    fn member(&self) -> MemberId {
         self.member
     }
 
@@ -161,7 +160,9 @@ impl Entity for TheLady {
             self.move_it(ctx, world);
         } else {
             // Nothing to fly her with between games; she holds her hover.
-            world.set_velocity(self.member, Velocity::default());
+            world
+                .member_mut(self.member)
+                .set_velocity(Velocity::default());
         }
     }
 
@@ -173,10 +174,11 @@ impl Entity for TheLady {
         // Read before `destroy` can retire the seat, so the rotors still have somewhere to draw
         // themselves from on the update she dies, and so a dead lady's last position survives the
         // retiring for `draw_pos` to hand back afterwards.
-        let pos = world.draw_pos(self.member);
+        let lady = world.member(self.member);
+        let pos = lady.draw_pos();
 
         // A ram or a shot; either is the end of her, and she asks after nothing else.
-        if world.contacts(self.member).touches(AIRCRAFT | ENEMY_SHOT) {
+        if lady.contacts().touches(AIRCRAFT | ENEMY_SHOT) {
             self.last_pos = pos;
             self.destroy(ctx, world, explosions);
             ctx.sfx(DESTROY_SFX);
