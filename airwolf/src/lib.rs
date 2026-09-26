@@ -13,8 +13,13 @@ use heapless::Vec;
 use pixel8::{physics::World, plume::Explosion, *};
 
 use crate::{
-    bullet::Bullet, common::Position, enemy_aircraft::EnemyAircraft, entity::Entity,
-    scrolling_map::ScrollingMap, shooter::Shooter, the_lady::TheLady,
+    bullet::Bullet,
+    common::{Position, AIRCRAFT, ENEMY_SHOT, FRIENDLY_SHOT, LADY},
+    enemy_aircraft::EnemyAircraft,
+    entity::Entity,
+    scrolling_map::ScrollingMap,
+    shooter::Shooter,
+    the_lady::TheLady,
 };
 
 pixel8::game!(Cart = Cart::new());
@@ -25,8 +30,8 @@ pub(crate) type Sky = World<MAX_CAST>;
 
 struct Cart {
     /// The one thing that moves anything in this cart, and the one thing that owns where
-    /// everybody is: bullets, aircraft and the lady each keep a `Member` handle into it beside
-    /// their own game data, rather than a position of their own.
+    /// everybody is: bullets, aircraft and the lady each keep the `MemberId` of their seat in it
+    /// beside their own game data, rather than a position of their own.
     world: Sky,
     bullets: Vec<Bullet, MAX_BULLETS>,
     explosions: Vec<Explosion, MAX_EXPLOSIONS>,
@@ -75,13 +80,13 @@ impl Cart {
         // here, and so does the lady's — whether she is still alive (the very first `start`,
         // nothing having killed her yet) or was already retired when she died.
         for bullet in self.bullets.drain(..) {
-            self.world.retire(bullet.member());
+            self.world.member_mut(bullet.member()).retire();
         }
         for aircraft in self.enemy_aircrafts.drain(..) {
-            self.world.retire(aircraft.member());
+            self.world.member_mut(aircraft.member()).retire();
         }
-        if self.world.seated(self.the_lady.member()) {
-            self.world.retire(self.the_lady.member());
+        if let Some(lady) = self.world.get_member_mut(self.the_lady.member()) {
+            lady.retire();
         }
 
         self.explosions.clear();
@@ -114,7 +119,7 @@ impl Cart {
                 return false;
             }
             if bullet.outside(world) {
-                world.retire(bullet.member());
+                world.member_mut(bullet.member()).retire();
                 return false;
             }
             true
@@ -138,7 +143,7 @@ impl Cart {
             // seat to give back here — a shot-down or rammed aircraft retired itself already.
             if aircraft.alive() && aircraft.outside(world) {
                 *score += LET_GO_SCORE_BUMP as u32;
-                world.retire(aircraft.member());
+                world.member_mut(aircraft.member()).retire();
             }
 
             keep
@@ -160,7 +165,7 @@ impl Cart {
                         // aircraft comes back out of the error so its seat can be given back,
                         // or the seat would be orphaned past every restart.
                         if let Err(aircraft) = self.enemy_aircrafts.push(aircraft) {
-                            self.world.retire(aircraft.member());
+                            self.world.member_mut(aircraft.member()).retire();
                             logf!(ctx, "Err: Too many aircrafts: {}", MAX_ENEMY_AIRCRAFTS);
                         }
                     }
@@ -307,15 +312,21 @@ impl Game for Cart {
         gfx.clear(Color::BLACK);
         self.smap.draw(gfx);
 
-        self.the_lady.draw(gfx, &self.state(), &self.world);
+        // The lady first, as the scene has always been layered: her sprite's black is paint and
+        // its dark grey is the sky showing through, so her layer is drawn under a transparency of
+        // its own.
+        gfx.set_transparent_color(Color::BLACK, false);
+        gfx.set_transparent_color(Color::DARK_GREY, true);
+        self.world.draw(gfx, LADY);
+        gfx.reset_transparency();
+        self.the_lady.draw_rotors(gfx);
 
-        self.bullets
-            .iter()
-            .for_each(|b| b.draw(gfx, &self.state(), &self.world));
+        // Every shot in flight, the blasts over them, and the aircraft over those: the world draws
+        // each layer of its cast where the step left it, and the explosions are the cart's own.
+        self.world.draw(gfx, FRIENDLY_SHOT | ENEMY_SHOT);
         self.explosions.iter().for_each(|e| e.draw(gfx));
-        self.enemy_aircrafts
-            .iter()
-            .for_each(|b| b.draw(gfx, &self.state(), &self.world));
+        self.world.draw(gfx, AIRCRAFT);
+        self.enemy_aircrafts.iter().for_each(|a| a.draw_rotors(gfx));
 
         let msg = match self.scene {
             Scene::Start => Some("Press O to start"),

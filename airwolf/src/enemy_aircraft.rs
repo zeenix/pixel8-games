@@ -2,9 +2,9 @@ use core::num::NonZeroU8;
 
 use heapless::VecView;
 use pixel8::{
-    physics::{Member, Velocity},
+    physics::{Member, MemberId, Velocity},
     plume::Explosion,
-    Context, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH,
+    Context, Graphics, SfxId, SpriteId, SCREEN_HEIGHT, SCREEN_WIDTH,
 };
 
 use crate::{
@@ -19,7 +19,7 @@ use crate::{
 pub struct EnemyAircraft {
     /// The aircraft's seat: where it is, how fast, and what its last step ran into — a shot of
     /// ours, or the lady herself.
-    member: Member,
+    member: MemberId,
     main_rotor: Rotor,
     tail_rotor: Rotor,
     last_bullet: f32,
@@ -34,15 +34,14 @@ pub struct EnemyAircraft {
 impl EnemyAircraft {
     pub fn new(ctx: &mut Context, world: &mut Sky) -> Option<Self> {
         let x = ctx.random(0.0..SCREEN_WIDTH as f32);
-        let member = world
-            .enlist(x, STARTING_Y, WIDTH, HEIGHT)?
+        let member = Member::builder(x, STARTING_Y, WIDTH, HEIGHT)
             // The cell it is drawn from, whose `AIRCRAFT` flag is what the lady is told she met
             // when one of these flies into her, and what our shots are spent on.
             .wearing(SPRITE_ID)
             // What can end it: our shots, and the lady it flies into. Its own side's shots fill
             // the sky around it and never concern it.
             .heeding(FRIENDLY_SHOT | LADY)
-            .member();
+            .enlist(world)?;
 
         Some(Self {
             member,
@@ -60,7 +59,8 @@ impl EnemyAircraft {
     }
 
     fn chase(&mut self, state: &CartState, world: &mut Sky) {
-        let (x, _) = world.draw_pos(self.member);
+        let mut aircraft = world.member_mut(self.member);
+        let (x, _) = aircraft.draw_pos();
 
         // Enemy aircraft just moves slowly down the screen but horizontally towards the player.
         let dx = if x < state.protoganist_pos.x {
@@ -71,7 +71,13 @@ impl EnemyAircraft {
             0.0
         };
 
-        world.set_velocity(self.member, Velocity::new(dx, SPEED));
+        aircraft.set_velocity(Velocity::new(dx, SPEED));
+    }
+
+    /// Its rotors, drawn over wherever the world drew it.
+    pub fn draw_rotors(&self, gfx: &mut Graphics) {
+        self.main_rotor.draw(gfx);
+        self.tail_rotor.draw(gfx);
     }
 }
 
@@ -99,7 +105,7 @@ impl Entity for EnemyAircraft {
         entity::Type::Enemy
     }
 
-    fn member(&self) -> Member {
+    fn member(&self) -> MemberId {
         self.member
     }
 
@@ -115,7 +121,9 @@ impl Entity for EnemyAircraft {
             self.chase(state, world);
         } else {
             // Whatever is in the air when the game ends hangs there.
-            world.set_velocity(self.member, Velocity::default());
+            world
+                .member_mut(self.member)
+                .set_velocity(Velocity::default());
         }
     }
 
@@ -123,13 +131,15 @@ impl Entity for EnemyAircraft {
         // Read before any `destroy` below can retire the seat, so the rotor still has something
         // to draw itself from this update — the aircraft is dropped by the retain pass right
         // after this and never drawn again either way, but nothing here needs to know that.
-        let pos = world.draw_pos(self.member);
+        let aircraft = world.member(self.member);
+        let pos = aircraft.draw_pos();
+        let contacts = aircraft.contacts();
 
-        if world.contacts(self.member).touches(FRIENDLY_SHOT) {
+        if contacts.touches(FRIENDLY_SHOT) {
             self.died_to_shot = true;
             self.destroy(ctx, world, explosions);
             ctx.sfx(DESTROY_SFX);
-        } else if world.contacts(self.member).touches(LADY) {
+        } else if contacts.touches(LADY) {
             // The ram, which has already cost her the same.
             self.destroy(ctx, world, explosions);
             ctx.sfx(DESTROY_SFX);
@@ -139,16 +149,9 @@ impl Entity for EnemyAircraft {
         self.tail_rotor.update(pos.into());
     }
 
-    fn draw(&self, gfx: &mut pixel8::Graphics, state: &CartState, world: &Sky) {
-        self.draw_default(gfx, state, world);
-
-        self.main_rotor.draw(gfx);
-        self.tail_rotor.draw(gfx);
-    }
-
     // Override the "outside" definition since the aircraft is spawned above the screen.
     fn outside(&self, world: &Sky) -> bool {
-        let bounds = world.bounds(self.member);
+        let bounds = world.member(self.member).bounds();
 
         bounds.x() >= SCREEN_WIDTH as i16
             || bounds.right() <= 0
